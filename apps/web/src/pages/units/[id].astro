@@ -1,0 +1,82 @@
+---
+import Base from '../../layouts/Base.astro'
+import PhotoGallery from '../../components/PhotoGallery.astro'
+import { supabase } from '../../lib/supabase'
+
+export async function getStaticPaths() {
+  const { data: units } = await supabase
+    .from('units')
+    .select('id')
+    .in('status', ['available', 'coming_soon'])
+  return (units ?? []).map((u) => ({ params: { id: u.id } }))
+}
+
+const { id } = Astro.params
+const { data: unit } = await supabase
+  .from('units')
+  .select('*, unit_photos(storage_path, alt_text, sort_order), building:buildings(*)')
+  .eq('id', id)
+  .single()
+
+if (!unit) return Astro.redirect('/404')
+
+const beds = unit.bedrooms === 0 ? 'Studio' : `${unit.bedrooms} bedroom`
+const rent = (unit.monthly_rent_cents / 100).toFixed(2)
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Apartment',
+  name: `Unit ${unit.unit_number} at ${unit.building.name}`,
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: unit.building.address_line1,
+    addressLocality: unit.building.city,
+    addressRegion: unit.building.state,
+    postalCode: unit.building.postal_code,
+    addressCountry: unit.building.country,
+  },
+  numberOfRooms: unit.bedrooms,
+  numberOfBathroomsTotal: unit.bathrooms,
+  ...(unit.sqft && { floorSize: { '@type': 'QuantitativeValue', value: unit.sqft, unitCode: 'FTK' } }),
+  offers: {
+    '@type': 'Offer',
+    price: rent,
+    priceCurrency: 'USD',
+    availability: 'https://schema.org/InStock',
+    ...(unit.available_from && { availabilityStarts: unit.available_from }),
+  },
+}
+
+const photos = (unit.unit_photos ?? []).sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
+---
+<Base
+  title={`Unit ${unit.unit_number} at ${unit.building.name} — $${(unit.monthly_rent_cents/100).toLocaleString()}/mo`}
+  description={`${beds} apartment${unit.sqft ? ', ' + unit.sqft + ' sqft' : ''} at ${unit.building.name}.`}
+  jsonLd={jsonLd}
+>
+  <section class="max-w-5xl mx-auto px-4 py-10">
+    <a href={`/buildings/${unit.building.slug}`} class="text-sm text-[var(--color-brand)] hover:underline">← Back to {unit.building.name}</a>
+    <h1 class="text-3xl font-bold mt-2">Unit {unit.unit_number}</h1>
+    <p class="text-gray-600">{unit.building.name}</p>
+  </section>
+
+  {photos.length > 0 && (
+    <section class="max-w-5xl mx-auto px-4 pb-6">
+      <PhotoGallery photos={photos} />
+    </section>
+  )}
+
+  <section class="max-w-5xl mx-auto px-4 py-6 flex flex-wrap gap-6 items-baseline">
+    <span class="text-3xl font-bold">${(unit.monthly_rent_cents / 100).toLocaleString()}<span class="text-base font-normal text-gray-500">/mo</span></span>
+    <span class="text-gray-700">{beds} · {unit.bathrooms} ba{unit.sqft ? ` · ${unit.sqft} sqft` : ''}</span>
+    {unit.available_from && <span class="text-gray-500">Available from {unit.available_from}</span>}
+  </section>
+
+  <section class="max-w-5xl mx-auto px-4 py-6">
+    <p class="prose">{unit.description_md}</p>
+  </section>
+
+  <section class="max-w-5xl mx-auto px-4 py-6 pb-16">
+    <a href={`/schedule?unit=${unit.id}`} class="inline-block bg-[var(--color-brand)] text-white px-5 py-2.5 rounded font-medium hover:bg-[var(--color-brand-dark)]">Schedule a showing</a>
+  </section>
+</Base>

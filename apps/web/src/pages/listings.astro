@@ -1,0 +1,55 @@
+---
+export const prerender = false
+import Base from '../layouts/Base.astro'
+import UnitCard from '../components/UnitCard.astro'
+import { supabase } from '../lib/supabase'
+
+const buildingFilter = Astro.url.searchParams.get('building') ?? null
+const bedsFilter = Astro.url.searchParams.get('bedrooms')
+const maxRent = Astro.url.searchParams.get('max_rent')
+
+let q = supabase
+  .from('units')
+  .select('id, unit_number, bedrooms, bathrooms, sqft, monthly_rent_cents, available_from, building:buildings(name, slug, id)')
+  .in('status', ['available', 'coming_soon'])
+  .order('monthly_rent_cents')
+
+if (buildingFilter) q = q.eq('buildings.slug', buildingFilter)
+if (bedsFilter !== null && bedsFilter !== '') q = q.eq('bedrooms', Number(bedsFilter))
+if (maxRent) q = q.lte('monthly_rent_cents', Number(maxRent) * 100)
+
+const { data: unitsData } = await q
+const units = unitsData ?? []
+
+const { data: buildingsData } = await supabase
+  .from('buildings').select('id, slug, name').eq('is_published', true).order('name')
+const buildings = buildingsData ?? []
+---
+<Base title="Available apartments" description="Browse all available apartments at Grass Lake Manor and Winnetka Manor.">
+  <section class="max-w-5xl mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold">Available apartments</h1>
+    <form method="get" class="flex flex-wrap gap-3 mt-4">
+      <select name="building" class="border rounded px-3 py-1.5">
+        <option value="">All buildings</option>
+        {buildings.map((b) => (
+          <option value={b.slug} selected={buildingFilter === b.slug}>{b.name}</option>
+        ))}
+      </select>
+      <select name="bedrooms" class="border rounded px-3 py-1.5">
+        <option value="">Any beds</option>
+        <option value="0" selected={bedsFilter === '0'}>Studio</option>
+        <option value="1" selected={bedsFilter === '1'}>1 bd</option>
+        <option value="2" selected={bedsFilter === '2'}>2 bd</option>
+        <option value="3" selected={bedsFilter === '3'}>3+ bd</option>
+      </select>
+      <input type="number" name="max_rent" placeholder="Max rent ($)" value={maxRent ?? ''} class="border rounded px-3 py-1.5 w-32" />
+      <button type="submit" class="bg-[var(--color-brand)] text-white px-3 py-1.5 rounded">Filter</button>
+      <a href="/listings" class="text-sm text-gray-500 self-center">Clear</a>
+    </form>
+  </section>
+  <section class="max-w-5xl mx-auto px-4 pb-12">
+    {units.length === 0 ? <p class="text-gray-600">No units match your filters.</p> : (
+      <div class="grid sm:grid-cols-2 gap-4">{units.map((u) => <UnitCard u={u} />)}</div>
+    )}
+  </section>
+</Base>

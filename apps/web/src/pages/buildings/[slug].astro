@@ -1,0 +1,75 @@
+---
+import Base from '../../layouts/Base.astro'
+import PhotoGallery from '../../components/PhotoGallery.astro'
+import UnitCard from '../../components/UnitCard.astro'
+import AmenityList from '../../components/AmenityList.astro'
+import { supabase } from '../../lib/supabase'
+
+export async function getStaticPaths() {
+  const { data: buildings } = await supabase
+    .from('buildings')
+    .select('slug')
+    .eq('is_published', true)
+  return (buildings ?? []).map((b) => ({ params: { slug: b.slug } }))
+}
+
+const { slug } = Astro.params
+const { data: building } = await supabase
+  .from('buildings')
+  .select('*, building_photos(storage_path, alt_text, sort_order)')
+  .eq('slug', slug)
+  .eq('is_published', true)
+  .single()
+
+if (!building) return Astro.redirect('/404')
+
+const { data: unitsData } = await supabase
+  .from('units')
+  .select('id, unit_number, bedrooms, bathrooms, sqft, monthly_rent_cents, available_from')
+  .eq('building_id', building.id)
+  .in('status', ['available', 'coming_soon'])
+  .order('monthly_rent_cents')
+const units = unitsData ?? []
+
+const photos = (building.building_photos ?? []).sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
+---
+<Base
+  title={building.seo_title ?? `${building.name} — Apartments for Rent`}
+  description={building.seo_description ?? building.description_md.slice(0, 160)}
+>
+  <section class="max-w-5xl mx-auto px-4 py-10">
+    <h1 class="text-3xl sm:text-4xl font-bold">{building.name}</h1>
+    <p class="text-gray-600 mt-1">{building.address_line1}, {building.city}, {building.state} {building.postal_code}</p>
+  </section>
+
+  {photos.length > 0 && (
+    <section class="max-w-5xl mx-auto px-4 pb-8">
+      <PhotoGallery photos={photos} />
+    </section>
+  )}
+
+  <section class="max-w-5xl mx-auto px-4 py-6">
+    <p class="prose">{building.description_md}</p>
+  </section>
+
+  <section class="max-w-5xl mx-auto px-4 py-8">
+    <h2 class="text-2xl font-semibold mb-4">Available units</h2>
+    {units.length === 0 ? (
+      <p class="text-gray-600">No units currently available. <a href="/contact" class="text-[var(--color-brand)] underline">Contact us</a> to be notified.</p>
+    ) : (
+      <div class="grid sm:grid-cols-2 gap-4">
+        {units.map((u) => <UnitCard u={u} />)}
+      </div>
+    )}
+  </section>
+
+  <section class="max-w-5xl mx-auto px-4 py-8">
+    <h2 class="text-2xl font-semibold mb-4">Neighborhood</h2>
+    <p class="prose">{building.neighborhood_md}</p>
+  </section>
+
+  <section class="max-w-5xl mx-auto px-4 py-8 pb-16">
+    <h2 class="text-2xl font-semibold mb-4">Amenities</h2>
+    <AmenityList amenities={building.amenities ?? []} />
+  </section>
+</Base>

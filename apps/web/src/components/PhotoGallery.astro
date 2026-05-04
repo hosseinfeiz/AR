@@ -1,0 +1,19 @@
+---
+import { transformedPhotoUrl } from '../lib/photo-url'
+import { clientEnv } from '../lib/env'
+interface Photo { storage_path: string; alt_text: string }
+interface Props { photos: Photo[] }
+const { photos } = Astro.props
+---
+{photos.length === 0 ? null : (
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+    {photos.map((p) => (
+      <img
+        src={transformedPhotoUrl(clientEnv.VITE_SUPABASE_URL, p.storage_path, { width: 800, quality: 75, format: 'webp' })}
+        alt={p.alt_text}
+        loading="lazy"
+        class="rounded-lg object-cover w-full aspect-[4/3]"
+      />
+    ))}
+  </div>
+)}
