@@ -1,0 +1,21 @@
+---
+import Base from '../layouts/Base.astro'
+import { supabase } from '../lib/supabase'
+const { data: buildingsData } = await supabase.from('buildings').select('id, name, address_line1, address_line2, city, state, postal_code, contact_phone, contact_email').eq('is_published', true).order('name')
+const buildings = buildingsData ?? []
+---
+<Base title="Contact AR Management" description="Get in touch with AR Management.">
+  <section class="max-w-3xl mx-auto px-4 py-12">
+    <h1 class="text-3xl font-bold">Contact</h1>
+    <div class="mt-6 grid sm:grid-cols-2 gap-6">
+      {buildings.map((b) => (
+        <div class="border border-gray-200 rounded-xl p-5">
+          <h2 class="font-semibold text-lg">{b.name}</h2>
+          <p class="text-sm text-gray-700 mt-1">{b.address_line1}{b.address_line2 ? `, ${b.address_line2}` : ''}<br />{b.city}, {b.state} {b.postal_code}</p>
+          {b.contact_phone && <p class="text-sm mt-2"><span class="text-gray-500">Phone:</span> <a href={`tel:${b.contact_phone}`} class="text-[var(--color-brand)] hover:underline">{b.contact_phone}</a></p>}
+          {b.contact_email && <p class="text-sm"><span class="text-gray-500">Email:</span> <a href={`mailto:${b.contact_email}`} class="text-[var(--color-brand)] hover:underline">{b.contact_email}</a></p>}
+        </div>
+      ))}
+    </div>
+  </section>
+</Base>
