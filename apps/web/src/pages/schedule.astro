@@ -6,7 +6,8 @@ import { supabase } from '../lib/supabase'
 import { clientEnv } from '../lib/env'
 
 const unitId = Astro.url.searchParams.get('unit')
-const { data: buildings = [] } = await supabase.from('buildings').select('id, name').eq('is_published', true).order('name')
+const { data: _buildings } = await supabase.from('buildings').select('id, name').eq('is_published', true).order('name')
+const buildings: { id: string; name: string }[] = _buildings ?? []
 
 let initialBuildingId: string | null = null
 if (unitId) {

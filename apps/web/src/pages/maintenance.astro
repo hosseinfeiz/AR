@@ -5,8 +5,9 @@ import { MaintenanceForm } from '../components/islands/MaintenanceForm'
 import { supabase } from '../lib/supabase'
 import { clientEnv } from '../lib/env'
 
-const { data: buildings = [] } = await supabase
+const { data: _buildings } = await supabase
   .from('buildings').select('id, name').eq('is_published', true).order('name')
+const buildings: { id: string; name: string }[] = _buildings ?? []
 ---
 <Base title="Submit a maintenance request" description="Tell us about a maintenance issue at your AR Management apartment.">
   <section class="max-w-2xl mx-auto px-4 py-10">
