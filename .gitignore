@@ -10,6 +10,7 @@ build/
 .expo/
 .vercel/
 .astro/
+.wrangler/
 *.tsbuildinfo
 
 # env
