@@ -1,0 +1,43 @@
+{
+  "name": "@ar/web",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "start": "astro dev",
+    "astro": "astro",
+    "typecheck": "astro check",
+    "lint": "eslint . --ext .astro,.ts,.tsx",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@ar/shared": "workspace:^",
+    "@astrojs/react": "^5.0.4",
+    "@astrojs/sitemap": "^3.7.2",
+    "@astrojs/vercel": "^10.0.6",
+    "@hookform/resolvers": "^5.2.2",
+    "@sentry/astro": "^10.51.0",
+    "@supabase/supabase-js": "^2.105.1",
+    "@tailwindcss/vite": "^4.2.4",
+    "astro": "^6.2.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-hook-form": "^7.75.0",
+    "tailwindcss": "^4.2.4"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
+    "@playwright/test": "^1.59.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "vitest": "^4.1.5"
+  }
+}
