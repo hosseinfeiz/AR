@@ -14,15 +14,21 @@ interface Props {
   buildings: { id: string; name: string }[]
   initialUnitId: string | null
   initialBuildingId: string | null
+  mockMode?: boolean
 }
 
-export function ShowingForm({ supabaseUrl, anonKey, turnstileSiteKey, buildings, initialUnitId, initialBuildingId }: Props) {
+function mockRefId(): string {
+  const a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+  return Array.from({ length: 8 }, () => a[Math.floor(Math.random() * a.length)]).join('')
+}
+
+export function ShowingForm({ supabaseUrl, anonKey, turnstileSiteKey, buildings, initialUnitId, initialBuildingId, mockMode = false }: Props) {
   const supabase = createClient(supabaseUrl, anonKey)
   const [buildingId, setBuildingId] = useState<string | null>(initialBuildingId)
   const [slots, setSlots] = useState<Slot[]>([])
   const [slotId, setSlotId] = useState<string | null>(null)
   const [d1, setD1] = useState(''); const [d2, setD2] = useState(''); const [d3, setD3] = useState('')
-  const [turnstile, setTurnstile] = useState<string | null>(null)
+  const [turnstile, setTurnstile] = useState<string | null>(mockMode ? 'dev-mock-token' : null)
   const [submitted, setSubmitted] = useState<{ ref_id: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,22 +40,27 @@ export function ShowingForm({ supabaseUrl, anonKey, turnstileSiteKey, buildings,
       unit_id: initialUnitId,
       slot_id: null,
       preferred_dates: null,
-      turnstile_token: '',
+      turnstile_token: mockMode ? 'dev-mock-token' : '',
     },
   })
 
   useEffect(() => {
-    if (!buildingId) { setSlots([]); return }
+    if (!buildingId || mockMode) { setSlots([]); return }
     supabase.from('availability_slots').select('id, starts_at, ends_at')
       .eq('building_id', buildingId).eq('status', 'open').gt('starts_at', new Date().toISOString())
       .order('starts_at').then(({ data }) => setSlots(data ?? []))
-  }, [buildingId])
+  }, [buildingId, mockMode])
 
   useEffect(() => { if (turnstile) setValue('turnstile_token', turnstile) }, [turnstile, setValue])
 
   async function onSubmit(values: ShowingRequestInput) {
     setError(null)
     const dates = [d1, d2, d3].filter(Boolean)
+    if (mockMode) {
+      await new Promise((r) => setTimeout(r, 500))
+      setSubmitted({ ref_id: mockRefId() })
+      return
+    }
     const { turnstile_token, ...payload } = values
     const finalPayload = {
       ...payload,
@@ -126,7 +137,7 @@ export function ShowingForm({ supabaseUrl, anonKey, turnstileSiteKey, buildings,
       <label className={labelCls}>Message (optional)</label>
       <textarea {...register('message')} rows={3} className={inputCls} />
 
-      <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstile} />
+      {!mockMode && <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstile} />}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

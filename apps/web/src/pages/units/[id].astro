@@ -1,24 +1,16 @@
 ---
 import Base from '../../layouts/Base.astro'
 import PhotoGallery from '../../components/PhotoGallery.astro'
-import { supabase } from '../../lib/supabase'
+import { listAvailableUnits, getUnitById } from '../../lib/data'
 
 export async function getStaticPaths() {
-  const { data: units } = await supabase
-    .from('units')
-    .select('id')
-    .in('status', ['available', 'coming_soon'])
-  return (units ?? []).map((u) => ({ params: { id: u.id } }))
+  const units = await listAvailableUnits()
+  return units.map((u) => ({ params: { id: u.id } }))
 }
 
 const { id } = Astro.params
-const { data: unit } = await supabase
-  .from('units')
-  .select('*, unit_photos(storage_path, alt_text, sort_order), building:buildings(*)')
-  .eq('id', id)
-  .single()
-
-if (!unit) return Astro.redirect('/404')
+const unit = await getUnitById(id!)
+if (!unit || !unit.building) return Astro.redirect('/404')
 
 const beds = unit.bedrooms === 0 ? 'Studio' : `${unit.bedrooms} bedroom`
 const rent = (unit.monthly_rent_cents / 100).toFixed(2)
@@ -47,7 +39,7 @@ const jsonLd = {
   },
 }
 
-const photos = (unit.unit_photos ?? []).sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
+const photos = (unit.unit_photos ?? []).sort((a, b) => a.sort_order - b.sort_order)
 ---
 <Base
   title={`Unit ${unit.unit_number} at ${unit.building.name} — $${(unit.monthly_rent_cents/100).toLocaleString()}/mo`}

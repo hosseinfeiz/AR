@@ -11,18 +11,24 @@ interface Props {
   anonKey: string
   turnstileSiteKey: string
   buildings: { id: string; name: string }[]
+  mockMode?: boolean
 }
 
-export function MaintenanceForm({ supabaseUrl, anonKey, turnstileSiteKey, buildings }: Props) {
+function mockRefId(): string {
+  const a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+  return Array.from({ length: 8 }, () => a[Math.floor(Math.random() * a.length)]).join('')
+}
+
+export function MaintenanceForm({ supabaseUrl, anonKey, turnstileSiteKey, buildings, mockMode = false }: Props) {
   const supabase = createClient(supabaseUrl, anonKey)
-  const [turnstile, setTurnstile] = useState<string | null>(null)
+  const [turnstile, setTurnstile] = useState<string | null>(mockMode ? 'dev-mock-token' : null)
   const [photoPaths, setPhotoPaths] = useState<string[]>([])
   const [submitted, setSubmitted] = useState<{ ref_id: string } | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, setValue, watch } = useForm<MaintenanceRequestInput>({
     resolver: zodResolver(MaintenanceRequestInputSchema),
-    defaultValues: { source: 'web', photo_paths: [], turnstile_token: '' },
+    defaultValues: { source: 'web', photo_paths: [], turnstile_token: mockMode ? 'dev-mock-token' : '' },
   })
 
   useEffect(() => { setValue('photo_paths', photoPaths) }, [photoPaths, setValue])
@@ -33,6 +39,11 @@ export function MaintenanceForm({ supabaseUrl, anonKey, turnstileSiteKey, buildi
 
   async function onSubmit(values: MaintenanceRequestInput) {
     setSubmitError(null)
+    if (mockMode) {
+      await new Promise((r) => setTimeout(r, 500))
+      setSubmitted({ ref_id: mockRefId() })
+      return
+    }
     const { turnstile_token, ...payload } = values
     const { data, error } = await supabase.from('maintenance_requests').insert(payload).select('ref_id').single()
     if (error) { setSubmitError(error.message); return }
@@ -104,9 +115,13 @@ export function MaintenanceForm({ supabaseUrl, anonKey, turnstileSiteKey, buildi
       {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
 
       <label className={labelCls}>Photos (optional, up to 5)</label>
-      <PhotoUploader supabaseUrl={supabaseUrl} anonKey={anonKey} turnstileToken={turnstile} onPathsChange={setPhotoPaths} />
+      {mockMode ? (
+        <p className="text-xs text-gray-500">Photo upload disabled in dev mock mode.</p>
+      ) : (
+        <PhotoUploader supabaseUrl={supabaseUrl} anonKey={anonKey} turnstileToken={turnstile} onPathsChange={setPhotoPaths} />
+      )}
 
-      <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstile} />
+      {!mockMode && <TurnstileWidget siteKey={turnstileSiteKey} onToken={setTurnstile} />}
 
       {submitError && <p className="text-red-600 text-sm">{submitError}</p>}
 

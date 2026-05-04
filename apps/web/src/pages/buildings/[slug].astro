@@ -3,35 +3,20 @@ import Base from '../../layouts/Base.astro'
 import PhotoGallery from '../../components/PhotoGallery.astro'
 import UnitCard from '../../components/UnitCard.astro'
 import AmenityList from '../../components/AmenityList.astro'
-import { supabase } from '../../lib/supabase'
+import { listBuildings, getBuildingBySlug, listAvailableUnits } from '../../lib/data'
 
 export async function getStaticPaths() {
-  const { data: buildings } = await supabase
-    .from('buildings')
-    .select('slug')
-    .eq('is_published', true)
-  return (buildings ?? []).map((b) => ({ params: { slug: b.slug } }))
+  const buildings = await listBuildings()
+  return buildings.map((b) => ({ params: { slug: b.slug } }))
 }
 
 const { slug } = Astro.params
-const { data: building } = await supabase
-  .from('buildings')
-  .select('*, building_photos(storage_path, alt_text, sort_order)')
-  .eq('slug', slug)
-  .eq('is_published', true)
-  .single()
-
+const building = await getBuildingBySlug(slug!)
 if (!building) return Astro.redirect('/404')
 
-const { data: unitsData } = await supabase
-  .from('units')
-  .select('id, unit_number, bedrooms, bathrooms, sqft, monthly_rent_cents, available_from')
-  .eq('building_id', building.id)
-  .in('status', ['available', 'coming_soon'])
-  .order('monthly_rent_cents')
-const units = unitsData ?? []
+const units = await listAvailableUnits({ building_id: building.id })
 
-const photos = (building.building_photos ?? []).sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
+const photos = (building.building_photos ?? []).sort((a, b) => a.sort_order - b.sort_order)
 ---
 <Base
   title={building.seo_title ?? `${building.name} — Apartments for Rent`}

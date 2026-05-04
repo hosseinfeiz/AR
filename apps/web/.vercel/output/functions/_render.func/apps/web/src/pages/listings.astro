@@ -2,19 +2,32 @@
 export const prerender = false
 import Base from '../layouts/Base.astro'
 import UnitCard from '../components/UnitCard.astro'
-import { listBuildings, listAvailableUnits } from '../lib/data'
+import { supabase } from '../lib/supabase'
 
 const buildingFilter = Astro.url.searchParams.get('building') ?? null
 const bedsFilter = Astro.url.searchParams.get('bedrooms')
 const maxRent = Astro.url.searchParams.get('max_rent')
 
-const units = await listAvailableUnits({
-  building_slug: buildingFilter ?? undefined,
-  bedrooms: bedsFilter !== null && bedsFilter !== '' ? Number(bedsFilter) : undefined,
-  max_rent_cents: maxRent ? Number(maxRent) * 100 : undefined,
-})
+let q = supabase
+  .from('units')
+  .select('id, unit_number, bedrooms, bathrooms, sqft, monthly_rent_cents, available_from, building:buildings(name, slug, id)')
+  .in('status', ['available', 'coming_soon'])
+  .order('monthly_rent_cents')
 
-const buildings = await listBuildings()
+if (buildingFilter) q = q.eq('buildings.slug', buildingFilter)
+if (bedsFilter !== null && bedsFilter !== '') q = q.eq('bedrooms', Number(bedsFilter))
+if (maxRent) q = q.lte('monthly_rent_cents', Number(maxRent) * 100)
+
+const { data: unitsData } = await q
+// Supabase returns joined relations as arrays; normalize building to a single object
+const units = (unitsData ?? []).map((u) => ({
+  ...u,
+  building: Array.isArray(u.building) ? u.building[0] : u.building,
+}))
+
+const { data: buildingsData } = await supabase
+  .from('buildings').select('id, slug, name').eq('is_published', true).order('name')
+const buildings = buildingsData ?? []
 ---
 <Base title="Available apartments" description="Browse all available apartments at Grass Lake Manor and Winnetka Manor.">
   <section class="max-w-5xl mx-auto px-4 py-10">

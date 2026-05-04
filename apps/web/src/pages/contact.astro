@@ -1,8 +1,7 @@
 ---
 import Base from '../layouts/Base.astro'
-import { supabase } from '../lib/supabase'
-const { data: buildingsData } = await supabase.from('buildings').select('id, name, address_line1, address_line2, city, state, postal_code, contact_phone, contact_email').eq('is_published', true).order('name')
-const buildings = buildingsData ?? []
+import { listBuildings } from '../lib/data'
+const buildings = await listBuildings()
 ---
 <Base title="Contact AR Management" description="Get in touch with AR Management.">
   <section class="max-w-3xl mx-auto px-4 py-12">

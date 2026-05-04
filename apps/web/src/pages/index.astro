@@ -1,12 +1,7 @@
 ---
 import Base from '../layouts/Base.astro'
-import { supabase } from '../lib/supabase'
-const { data: buildingsData } = await supabase
-  .from('buildings')
-  .select('id, slug, name, address_line1, city, state')
-  .eq('is_published', true)
-  .order('name')
-const buildings = buildingsData ?? []
+import { listBuildings } from '../lib/data'
+const buildings = await listBuildings()
 ---
 <Base
   title="Apartments at Grass Lake Manor and Winnetka Manor"
