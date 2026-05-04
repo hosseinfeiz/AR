@@ -1,0 +1,90 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import { getSession } from '../../../lib/auth'
+import { tenants, leases, charges } from '../../../lib/tenant-fixtures'
+import { buildings } from '../../../lib/fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/tenants')
+}
+
+function fmt(cents: number) {
+  return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+  })
+}
+
+const rows = tenants.map((t) => {
+  const lease = leases.find((l) => l.tenant_id === t.id)
+  const building = buildings.find((b) => b.id === t.building_id)
+  const tenantCharges = charges.filter((c) => c.tenant_id === t.id)
+  const hasOverdue = tenantCharges.some((c) => c.status === 'overdue')
+  const hasDue = tenantCharges.some((c) => c.status === 'due')
+  const status = hasOverdue ? 'overdue' : hasDue ? 'current' : 'current'
+  return { tenant: t, lease, building, status }
+})
+---
+<Base title="Tenants — Admin — AR Management">
+  <div class="max-w-5xl mx-auto px-4 py-10">
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <p class="text-sm text-gray-500 mb-1"><a href="/admin" class="hover:underline">Admin</a> / Tenants</p>
+        <h1 class="text-3xl font-bold tracking-tight">All tenants</h1>
+      </div>
+    </div>
+
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200">
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Name</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Email</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Unit</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Move-in</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Lease end</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Monthly rent</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Status</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ tenant, lease, status }) => (
+            <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-full bg-[var(--color-brand)] text-white text-xs font-bold flex items-center justify-center shrink-0">
+                    {tenant.avatar_initials}
+                  </div>
+                  <a href={`/admin/tenants/${tenant.id}`} class="font-medium hover:text-[var(--color-brand)] hover:underline">
+                    {tenant.name}
+                  </a>
+                </div>
+              </td>
+              <td class="px-4 py-3 text-gray-600">{tenant.email}</td>
+              <td class="px-4 py-3 text-gray-600">{tenant.unit_label}</td>
+              <td class="px-4 py-3 text-gray-600">{fmtDate(tenant.move_in_date)}</td>
+              <td class="px-4 py-3 text-gray-600">{lease ? fmtDate(lease.end_date) : '—'}</td>
+              <td class="px-4 py-3 text-gray-800 font-medium">{lease ? `$${fmt(lease.monthly_rent_cents)}` : '—'}</td>
+              <td class="px-4 py-3">
+                {status === 'overdue' ? (
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Overdue</span>
+                ) : (
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Current</span>
+                )}
+              </td>
+              <td class="px-4 py-3 text-right">
+                <a href={`/admin/tenants/${tenant.id}`} class="text-[var(--color-brand)] hover:underline text-xs font-medium">View →</a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Base>

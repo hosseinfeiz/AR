@@ -1,0 +1,18 @@
+---
+export const prerender = false
+import Base from '../layouts/Base.astro'
+import { LoginForm } from '../components/islands/LoginForm'
+import { getSession } from '../lib/auth'
+
+const session = getSession(Astro.cookies)
+if (session) {
+  return Astro.redirect(session.type === 'admin' ? '/admin' : '/portal')
+}
+
+const redirect = Astro.url.searchParams.get('redirect') ?? undefined
+---
+<Base title="Sign in — AR Management" description="Sign in to the AR Management tenant portal or admin dashboard.">
+  <section class="min-h-[70vh] flex items-center justify-center px-4 py-12">
+    <LoginForm client:load redirect={redirect} />
+  </section>
+</Base>

@@ -1,0 +1,188 @@
+---
+export const prerender = false
+import Base from '../../layouts/Base.astro'
+import PortalNav from '../../components/PortalNav.astro'
+import { getSession } from '../../lib/auth'
+import {
+  findTenantById,
+  leaseForTenant,
+  chargesForTenant,
+  messagesForTenant,
+  requestsForTenant,
+} from '../../lib/tenant-fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'tenant') {
+  return Astro.redirect('/login?redirect=/portal')
+}
+
+const tenant = findTenantById(session.tenantId)
+if (!tenant) {
+  return Astro.redirect('/login')
+}
+
+const lease = leaseForTenant(tenant.id)
+const allCharges = chargesForTenant(tenant.id)
+const openCharge = allCharges.find((c) => c.status === 'due' || c.status === 'overdue')
+const latestMessages = messagesForTenant(tenant.id).slice(0, 3)
+const latestRequests = requestsForTenant(tenant.id).slice(0, 2)
+const firstName = tenant.name.split(' ')[0]
+
+function fmt(cents: number) {
+  return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+  })
+}
+
+function fmtTs(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+  })
+}
+
+const reqStatusPill: Record<string, string> = {
+  new: 'bg-gray-100 text-gray-700',
+  acknowledged: 'bg-blue-100 text-blue-800',
+  in_progress: 'bg-amber-100 text-amber-800',
+  resolved: 'bg-green-100 text-green-800',
+  closed: 'bg-gray-100 text-gray-500',
+}
+---
+<Base title="My Portal — AR Management">
+  <PortalNav active="overview" />
+  <div class="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <!-- Greeting -->
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight">Hi, {firstName}!</h1>
+      <p class="text-gray-500 mt-1">{tenant.unit_label}</p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-5">
+      <!-- Lease summary -->
+      <div class="border border-gray-200 rounded-xl p-5">
+        <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Lease summary</h2>
+        {lease ? (
+          <dl class="space-y-2 text-sm">
+            <div class="flex justify-between"><dt class="text-gray-500">Unit</dt><dd class="font-medium">{tenant.unit_label}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">Monthly rent</dt><dd class="font-bold text-lg">${fmt(lease.monthly_rent_cents)}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">Lease ends</dt><dd class="font-medium">{fmtDate(lease.end_date)}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">Status</dt>
+              <dd><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{lease.status}</span></dd>
+            </div>
+          </dl>
+        ) : <p class="text-sm text-gray-500">No active lease on file.</p>}
+      </div>
+
+      <!-- Next payment -->
+      <div class={`border rounded-xl p-5 ${openCharge?.status === 'overdue' ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}>
+        <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Next payment</h2>
+        {openCharge ? (
+          <div>
+            <p class="text-sm text-gray-600 mb-1">{openCharge.description}</p>
+            <p class={`text-2xl font-bold ${openCharge.status === 'overdue' ? 'text-red-700' : 'text-gray-900'}`}>${fmt(openCharge.amount_cents)}</p>
+            <p class="text-sm text-gray-500 mt-1">Due {fmtDate(openCharge.due_date)}</p>
+            {openCharge.status === 'overdue' && (
+              <p class="text-xs text-red-700 font-medium mt-1">Payment overdue</p>
+            )}
+            <button
+              id="pay-btn"
+              data-charge-id={openCharge.id}
+              class={`mt-4 inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-white transition ${openCharge.status === 'overdue' ? 'bg-red-600 hover:bg-red-700' : 'bg-[var(--color-brand)] hover:bg-[var(--color-brand-dark)]'}`}
+            >
+              Pay now
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p class="text-green-800 font-medium">All caught up!</p>
+            <p class="text-sm text-gray-500 mt-1">No outstanding charges.</p>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <!-- Latest messages -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+        <h2 class="font-semibold">Recent messages</h2>
+        <a href="/portal/messages" class="text-sm text-[var(--color-brand)] hover:underline">View all</a>
+      </div>
+      {latestMessages.length === 0 ? (
+        <p class="px-5 py-4 text-sm text-gray-500">No messages yet.</p>
+      ) : (
+        <ul class="divide-y divide-gray-100">
+          {latestMessages.map((m) => (
+            <li class="px-5 py-3 flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <p class={`text-sm font-medium truncate ${m.read ? 'text-gray-700' : 'text-gray-900'}`}>{m.subject}</p>
+                <p class="text-xs text-gray-500">{m.from_name} · {fmtTs(m.sent_at)}</p>
+              </div>
+              {!m.read && <span class="shrink-0 w-2 h-2 rounded-full bg-[var(--color-brand)]"></span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+
+    <!-- Latest maintenance requests -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+        <h2 class="font-semibold">Recent maintenance requests</h2>
+        <a href="/portal/maintenance" class="text-sm text-[var(--color-brand)] hover:underline">View all</a>
+      </div>
+      {latestRequests.length === 0 ? (
+        <p class="px-5 py-4 text-sm text-gray-500">No requests yet.</p>
+      ) : (
+        <ul class="divide-y divide-gray-100">
+          {latestRequests.map((r) => (
+            <li class="px-5 py-3 flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-gray-800 capitalize">{r.issue_type.replace('_', ' ')} — {r.description.slice(0, 60)}{r.description.length > 60 ? '…' : ''}</p>
+                <p class="text-xs text-gray-500">Ref: {r.ref_id} · {fmtTs(r.created_at)}</p>
+              </div>
+              <span class={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${reqStatusPill[r.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                {r.status.replace('_', ' ')}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </div>
+</Base>
+
+<script>
+  const btn = document.getElementById('pay-btn')
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      const chargeId = btn.getAttribute('data-charge-id')
+      if (!chargeId) return
+      btn.textContent = 'Processing…'
+      ;(btn as HTMLButtonElement).disabled = true
+      try {
+        const res = await fetch('/api/portal/pay-charge', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ chargeId }),
+        })
+        const data = await res.json() as { ok: boolean; receipt_number?: string; error?: string }
+        if (data.ok) {
+          alert(`Payment successful! Receipt: ${data.receipt_number}`)
+          window.location.reload()
+        } else {
+          alert(`Payment failed: ${data.error ?? 'Unknown error'}`)
+          btn.textContent = 'Pay now'
+          ;(btn as HTMLButtonElement).disabled = false
+        }
+      } catch {
+        alert('Network error. Please try again.')
+        btn.textContent = 'Pay now'
+        ;(btn as HTMLButtonElement).disabled = false
+      }
+    })
+  }
+</script>

@@ -1,0 +1,99 @@
+---
+export const prerender = false
+import Base from '../../layouts/Base.astro'
+import PortalNav from '../../components/PortalNav.astro'
+import { getSession } from '../../lib/auth'
+import { findTenantById, requestsForTenant } from '../../lib/tenant-fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'tenant') {
+  return Astro.redirect('/login?redirect=/portal/maintenance')
+}
+
+const tenant = findTenantById(session.tenantId)
+if (!tenant) return Astro.redirect('/login')
+
+const requests = requestsForTenant(tenant.id)
+
+function fmtTs(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+  })
+}
+
+const statusPill: Record<string, string> = {
+  new: 'bg-gray-100 text-gray-700',
+  acknowledged: 'bg-blue-100 text-blue-800',
+  in_progress: 'bg-amber-100 text-amber-800',
+  resolved: 'bg-green-100 text-green-800',
+  closed: 'bg-gray-100 text-gray-500',
+}
+
+const urgencyPill: Record<string, string> = {
+  low: 'bg-gray-100 text-gray-600',
+  normal: 'bg-blue-50 text-blue-700',
+  high: 'bg-orange-100 text-orange-700',
+  emergency: 'bg-red-100 text-red-800',
+}
+---
+<Base title="Maintenance — My Portal — AR Management">
+  <PortalNav active="maintenance" />
+  <div class="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <div class="flex items-center justify-between">
+      <h1 class="text-3xl font-bold tracking-tight">Maintenance requests</h1>
+      <a
+        href="/maintenance"
+        class="inline-flex items-center bg-[var(--color-brand)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-brand-dark)] transition"
+      >
+        + Submit new request
+      </a>
+    </div>
+
+    {requests.length === 0 ? (
+      <div class="border border-gray-200 rounded-xl p-10 text-center">
+        <p class="text-gray-500">No maintenance requests on file.</p>
+        <a href="/maintenance" class="mt-4 inline-block text-sm text-[var(--color-brand)] hover:underline">Submit your first request →</a>
+      </div>
+    ) : (
+      <div class="border border-gray-200 rounded-xl overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-200 bg-gray-50">
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Ref ID</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Issue type</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Urgency</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Submitted</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {requests.map((r) => (
+              <tr class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="px-4 py-3 font-mono text-xs text-gray-700">{r.ref_id}</td>
+                <td class="px-4 py-3 capitalize text-gray-800">{r.issue_type}</td>
+                <td class="px-4 py-3">
+                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusPill[r.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                    {r.status.replace('_', ' ')}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${urgencyPill[r.urgency] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {r.urgency}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-gray-600">{fmtTs(r.created_at)}</td>
+                <td class="px-4 py-3 text-gray-600 max-w-xs">
+                  <p class="truncate">{r.description}</p>
+                  {r.manager_notes && (
+                    <p class="text-xs text-gray-500 mt-0.5 truncate">Note: {r.manager_notes}</p>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+</Base>

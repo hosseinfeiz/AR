@@ -3,12 +3,7 @@ import Base from '../../layouts/Base.astro'
 import PhotoGallery from '../../components/PhotoGallery.astro'
 import UnitCard from '../../components/UnitCard.astro'
 import AmenityList from '../../components/AmenityList.astro'
-import { listBuildings, getBuildingBySlug, listAvailableUnits } from '../../lib/data'
-
-export async function getStaticPaths() {
-  const buildings = await listBuildings()
-  return buildings.map((b) => ({ params: { slug: b.slug } }))
-}
+import { getBuildingBySlug, listAvailableUnits } from '../../lib/data'
 
 const { slug } = Astro.params
 const building = await getBuildingBySlug(slug!)

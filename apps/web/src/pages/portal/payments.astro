@@ -1,0 +1,162 @@
+---
+export const prerender = false
+import Base from '../../layouts/Base.astro'
+import PortalNav from '../../components/PortalNav.astro'
+import { getSession } from '../../lib/auth'
+import {
+  findTenantById,
+  chargesForTenant,
+  paymentsForTenant,
+} from '../../lib/tenant-fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'tenant') {
+  return Astro.redirect('/login?redirect=/portal/payments')
+}
+
+const tenant = findTenantById(session.tenantId)
+if (!tenant) return Astro.redirect('/login')
+
+const allCharges = chargesForTenant(tenant.id)
+const allPayments = paymentsForTenant(tenant.id)
+
+function fmt(cents: number) {
+  return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+  })
+}
+
+function fmtTs(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+  })
+}
+
+const chargePill: Record<string, string> = {
+  paid: 'bg-green-100 text-green-800',
+  due: 'bg-blue-100 text-blue-800',
+  overdue: 'bg-red-100 text-red-800',
+}
+---
+<Base title="Payments — My Portal — AR Management">
+  <PortalNav active="payments" />
+  <div class="max-w-5xl mx-auto px-4 py-8 space-y-8">
+    <h1 class="text-3xl font-bold tracking-tight">Payments</h1>
+
+    <!-- Charges -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-semibold">All charges</h2>
+      </div>
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100 bg-gray-50">
+            <th class="text-left px-4 py-2 font-medium text-gray-600">Description</th>
+            <th class="text-left px-4 py-2 font-medium text-gray-600">Due date</th>
+            <th class="text-left px-4 py-2 font-medium text-gray-600">Amount</th>
+            <th class="text-left px-4 py-2 font-medium text-gray-600">Status</th>
+            <th class="px-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {allCharges.map((c) => {
+            const payment = c.paid_payment_id ? allPayments.find((p) => p.id === c.paid_payment_id) : null
+            return (
+              <tr class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="px-4 py-3">
+                  <p class="font-medium">{c.description}</p>
+                  {payment && (
+                    <p class="text-xs text-gray-500 mt-0.5">Paid {fmtTs(payment.paid_at)}</p>
+                  )}
+                </td>
+                <td class="px-4 py-3 text-gray-600">{fmtDate(c.due_date)}</td>
+                <td class="px-4 py-3 font-medium">${fmt(c.amount_cents)}</td>
+                <td class="px-4 py-3">
+                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${chargePill[c.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                    {c.status}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  {(c.status === 'due' || c.status === 'overdue') && (
+                    <button
+                      class="pay-now-btn text-xs bg-[var(--color-brand)] text-white px-3 py-1.5 rounded-lg hover:bg-[var(--color-brand-dark)] transition"
+                      data-charge-id={c.id}
+                    >
+                      Pay now
+                    </button>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Payment history -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-semibold">Payment history</h2>
+      </div>
+      {allPayments.length === 0 ? (
+        <p class="px-5 py-4 text-sm text-gray-500">No payments on record.</p>
+      ) : (
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100 bg-gray-50">
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Receipt</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Date</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Amount</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Method</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allPayments.map((p) => (
+              <tr class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="px-4 py-3 font-mono text-xs">{p.receipt_number}</td>
+                <td class="px-4 py-3 text-gray-600">{fmtTs(p.paid_at)}</td>
+                <td class="px-4 py-3 font-medium">${fmt(p.amount_cents)}</td>
+                <td class="px-4 py-3 text-gray-600 uppercase text-xs">{p.method}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </div>
+</Base>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('.pay-now-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const chargeId = btn.getAttribute('data-charge-id')
+      if (!chargeId) return
+      btn.textContent = 'Processing…'
+      btn.disabled = true
+      try {
+        const res = await fetch('/api/portal/pay-charge', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ chargeId }),
+        })
+        const data = await res.json() as { ok: boolean; receipt_number?: string; error?: string }
+        if (data.ok) {
+          alert(`Payment successful! Receipt: ${data.receipt_number}`)
+          window.location.reload()
+        } else {
+          alert(`Payment failed: ${data.error ?? 'Unknown error'}`)
+          btn.textContent = 'Pay now'
+          btn.disabled = false
+        }
+      } catch {
+        alert('Network error. Please try again.')
+        btn.textContent = 'Pay now'
+        btn.disabled = false
+      }
+    })
+  })
+</script>

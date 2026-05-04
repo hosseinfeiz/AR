@@ -1,6 +1,10 @@
 ---
+import { getSession } from '../lib/auth'
+import { LogoutButton } from './islands/LogoutButton'
+
+const session = getSession(Astro.cookies)
+
 const links = [
-  { href: '/', label: 'Home' },
   { href: '/listings', label: 'Listings' },
   { href: '/maintenance', label: 'Maintenance' },
   { href: '/about', label: 'About' },
@@ -11,10 +15,29 @@ const links = [
   <nav class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
     <a href="/" class="text-xl font-bold tracking-tight">AR Management</a>
     <ul class="hidden sm:flex gap-6 text-sm">
-      {links.slice(1).map((l) => (
+      {links.map((l) => (
         <li><a href={l.href} class="text-gray-700 hover:text-[var(--color-brand)]">{l.label}</a></li>
       ))}
     </ul>
-    <a href="/schedule" class="hidden sm:inline-flex bg-[var(--color-brand)] text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-[var(--color-brand-dark)]">Schedule a showing</a>
+    <div class="hidden sm:flex items-center gap-3">
+      {session === null && (
+        <>
+          <a href="/login" class="text-sm text-gray-600 hover:text-gray-900">Sign in</a>
+          <a href="/schedule" class="inline-flex bg-[var(--color-brand)] text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-[var(--color-brand-dark)]">Schedule a showing</a>
+        </>
+      )}
+      {session?.type === 'admin' && (
+        <>
+          <a href="/admin" class="text-sm font-medium text-gray-700 hover:text-[var(--color-brand)]">Admin</a>
+          <LogoutButton client:load className="text-sm text-gray-600 hover:text-gray-900" />
+        </>
+      )}
+      {session?.type === 'tenant' && (
+        <>
+          <a href="/portal" class="text-sm font-medium text-gray-700 hover:text-[var(--color-brand)]">My Portal</a>
+          <LogoutButton client:load className="text-sm text-gray-600 hover:text-gray-900" />
+        </>
+      )}
+    </div>
   </nav>
 </header>

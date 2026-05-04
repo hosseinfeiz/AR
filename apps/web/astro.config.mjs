@@ -9,7 +9,7 @@ const SITE = process.env.PUBLIC_SITE_URL ?? 'https://ar-management.example'
 
 export default defineConfig({
   site: SITE,
-  output: 'static',
+  output: 'server',
   adapter: vercel({
     webAnalytics: { enabled: false },
   }),

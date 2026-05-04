@@ -1,0 +1,232 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import { getSession } from '../../../lib/auth'
+import {
+  findTenantById,
+  leaseForTenant,
+  chargesForTenant,
+  paymentsForTenant,
+  messagesForTenant,
+  requestsForTenant,
+} from '../../../lib/tenant-fixtures'
+import { buildings } from '../../../lib/fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=' + Astro.url.pathname)
+}
+
+const { id } = Astro.params
+const tenant = id ? findTenantById(id) : null
+if (!tenant) {
+  return Astro.redirect('/admin/tenants')
+}
+
+const lease = leaseForTenant(tenant.id)
+const tenantCharges = chargesForTenant(tenant.id)
+const tenantPayments = paymentsForTenant(tenant.id)
+const tenantMessages = messagesForTenant(tenant.id)
+const tenantReqs = requestsForTenant(tenant.id)
+const building = buildings.find((b) => b.id === tenant.building_id)
+
+function fmt(cents: number) {
+  return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+  })
+}
+
+function fmtTs(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+  })
+}
+
+const statusPill: Record<string, string> = {
+  paid: 'bg-green-100 text-green-800',
+  due: 'bg-blue-100 text-blue-800',
+  overdue: 'bg-red-100 text-red-800',
+  new: 'bg-gray-100 text-gray-700',
+  acknowledged: 'bg-blue-100 text-blue-800',
+  in_progress: 'bg-amber-100 text-amber-800',
+  resolved: 'bg-green-100 text-green-800',
+  closed: 'bg-gray-100 text-gray-500',
+}
+---
+<Base title={`${tenant.name} — Admin — AR Management`}>
+  <div class="max-w-5xl mx-auto px-4 py-10 space-y-8">
+    <!-- Breadcrumb -->
+    <div>
+      <p class="text-sm text-gray-500 mb-1">
+        <a href="/admin" class="hover:underline">Admin</a> /
+        <a href="/admin/tenants" class="hover:underline ml-1">Tenants</a> /
+        <span class="ml-1">{tenant.name}</span>
+      </p>
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-full bg-[var(--color-brand)] text-white text-lg font-bold flex items-center justify-center">
+          {tenant.avatar_initials}
+        </div>
+        <div>
+          <h1 class="text-3xl font-bold tracking-tight">{tenant.name}</h1>
+          <p class="text-gray-500">{tenant.email} {tenant.phone ? `· ${tenant.phone}` : ''}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile + Lease -->
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div class="border border-gray-200 rounded-xl p-5">
+        <h2 class="font-semibold mb-3">Unit &amp; Building</h2>
+        <dl class="space-y-1.5 text-sm">
+          <div class="flex justify-between"><dt class="text-gray-500">Unit</dt><dd class="font-medium">{tenant.unit_label}</dd></div>
+          <div class="flex justify-between"><dt class="text-gray-500">Building</dt><dd class="font-medium">{building?.name ?? '—'}</dd></div>
+          <div class="flex justify-between"><dt class="text-gray-500">Move-in</dt><dd class="font-medium">{fmtDate(tenant.move_in_date)}</dd></div>
+        </dl>
+      </div>
+      <div class="border border-gray-200 rounded-xl p-5">
+        <h2 class="font-semibold mb-3">Lease</h2>
+        {lease ? (
+          <dl class="space-y-1.5 text-sm">
+            <div class="flex justify-between"><dt class="text-gray-500">Start</dt><dd class="font-medium">{fmtDate(lease.start_date)}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">End</dt><dd class="font-medium">{fmtDate(lease.end_date)}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">Monthly rent</dt><dd class="font-bold text-base">${fmt(lease.monthly_rent_cents)}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">Security deposit</dt><dd class="font-medium">${fmt(lease.security_deposit_cents)}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">Status</dt>
+              <dd><span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${lease.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>{lease.status}</span></dd>
+            </div>
+          </dl>
+        ) : <p class="text-sm text-gray-500">No lease on file.</p>}
+      </div>
+    </div>
+
+    <!-- Charges -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-semibold">Charges</h2>
+      </div>
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100 bg-gray-50">
+            <th class="text-left px-4 py-2 font-medium text-gray-600">Description</th>
+            <th class="text-left px-4 py-2 font-medium text-gray-600">Due date</th>
+            <th class="text-left px-4 py-2 font-medium text-gray-600">Amount</th>
+            <th class="text-left px-4 py-2 font-medium text-gray-600">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tenantCharges.map((c) => (
+            <tr class="border-b border-gray-100 hover:bg-gray-50">
+              <td class="px-4 py-2.5">{c.description}</td>
+              <td class="px-4 py-2.5 text-gray-600">{fmtDate(c.due_date)}</td>
+              <td class="px-4 py-2.5 font-medium">${fmt(c.amount_cents)}</td>
+              <td class="px-4 py-2.5">
+                <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusPill[c.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                  {c.status}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Payment history -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-semibold">Payment history</h2>
+      </div>
+      {tenantPayments.length === 0 ? (
+        <p class="px-5 py-4 text-sm text-gray-500">No payments on record.</p>
+      ) : (
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100 bg-gray-50">
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Receipt</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Date</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Amount</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Method</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tenantPayments.map((p) => (
+              <tr class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="px-4 py-2.5 font-mono text-xs">{p.receipt_number}</td>
+                <td class="px-4 py-2.5 text-gray-600">{fmtTs(p.paid_at)}</td>
+                <td class="px-4 py-2.5 font-medium">${fmt(p.amount_cents)}</td>
+                <td class="px-4 py-2.5 text-gray-600 uppercase text-xs">{p.method}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+
+    <!-- Maintenance requests -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-semibold">Maintenance requests</h2>
+      </div>
+      {tenantReqs.length === 0 ? (
+        <p class="px-5 py-4 text-sm text-gray-500">No requests on record.</p>
+      ) : (
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100 bg-gray-50">
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Ref</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Type</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Urgency</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Status</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Created</th>
+              <th class="text-left px-4 py-2 font-medium text-gray-600">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tenantReqs.map((r) => (
+              <tr class="border-b border-gray-100 hover:bg-gray-50">
+                <td class="px-4 py-2.5 font-mono text-xs">{r.ref_id}</td>
+                <td class="px-4 py-2.5 capitalize text-gray-700">{r.issue_type}</td>
+                <td class="px-4 py-2.5 capitalize text-gray-600">{r.urgency}</td>
+                <td class="px-4 py-2.5">
+                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusPill[r.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                    {r.status.replace('_', ' ')}
+                  </span>
+                </td>
+                <td class="px-4 py-2.5 text-gray-600">{fmtTs(r.created_at)}</td>
+                <td class="px-4 py-2.5 text-gray-500 text-xs max-w-xs truncate">{r.manager_notes ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+
+    <!-- Messages -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-semibold">Messages</h2>
+      </div>
+      {tenantMessages.length === 0 ? (
+        <p class="px-5 py-4 text-sm text-gray-500">No messages.</p>
+      ) : (
+        <div class="divide-y divide-gray-100">
+          {tenantMessages.map((m) => (
+            <div class="px-5 py-4">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <p class={`text-sm font-medium ${m.read ? 'text-gray-700' : 'text-gray-900'}`}>{m.subject}</p>
+                  <p class="text-xs text-gray-500 mt-0.5">{m.from_name} · {fmtTs(m.sent_at)} · <span class="capitalize">{m.category}</span></p>
+                </div>
+                {!m.read && <span class="shrink-0 w-2 h-2 rounded-full bg-[var(--color-brand)] mt-1.5"></span>}
+              </div>
+              <p class="text-sm text-gray-600 mt-2 whitespace-pre-wrap line-clamp-3">{m.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+</Base>

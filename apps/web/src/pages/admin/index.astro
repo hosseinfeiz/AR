@@ -1,0 +1,125 @@
+---
+export const prerender = false
+import Base from '../../layouts/Base.astro'
+import { getSession } from '../../lib/auth'
+import {
+  tenants,
+  leases,
+  charges,
+  payments,
+  tenantRequests,
+  messages,
+} from '../../lib/tenant-fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin')
+}
+
+function fmt(cents: number) {
+  return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const activeLeases = leases.filter((l) => l.status === 'active')
+const totalMonthlyRent = activeLeases.reduce((s, l) => s + l.monthly_rent_cents, 0)
+
+const thisMonthStart = new Date('2026-05-01')
+const thisMonthEnd = new Date('2026-05-31')
+
+const dueOverdue = charges.filter((c) => c.status === 'due' || c.status === 'overdue')
+const dueOverdueTotal = dueOverdue.reduce((s, c) => s + c.amount_cents, 0)
+
+const paidThisMonth = charges.filter((c) => {
+  if (c.status !== 'paid' || !c.paid_payment_id) return false
+  const p = payments.find((pay) => pay.id === c.paid_payment_id)
+  if (!p) return false
+  const pDate = new Date(p.paid_at)
+  return pDate >= thisMonthStart && pDate <= thisMonthEnd
+})
+const paidThisMonthTotal = paidThisMonth.reduce((s, c) => s + c.amount_cents, 0)
+
+const openRequests = tenantRequests.filter((r) => r.status === 'new' || r.status === 'acknowledged' || r.status === 'in_progress')
+const unreadMessages = messages.filter((m) => !m.read)
+---
+<Base title="Admin Dashboard — AR Management">
+  <div class="max-w-5xl mx-auto px-4 py-10">
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+        <p class="text-gray-500 mt-1">AR Management — overview</p>
+      </div>
+      <a href="/" class="text-sm text-gray-500 hover:text-gray-800">← Back to site</a>
+    </div>
+
+    <!-- Stats grid -->
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
+      <div class="border border-gray-200 rounded-xl p-5">
+        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Total tenants</p>
+        <p class="text-3xl font-bold mt-1">{tenants.length}</p>
+        <p class="text-xs text-gray-400 mt-1">{activeLeases.length} active leases</p>
+      </div>
+      <div class="border border-gray-200 rounded-xl p-5">
+        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Monthly rent roll</p>
+        <p class="text-3xl font-bold mt-1">${fmt(totalMonthlyRent)}</p>
+        <p class="text-xs text-gray-400 mt-1">across all active leases</p>
+      </div>
+      <div class="border border-gray-200 rounded-xl p-5">
+        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Due / overdue</p>
+        <p class="text-3xl font-bold mt-1 text-amber-600">{dueOverdue.length} charges</p>
+        <p class="text-xs text-gray-400 mt-1">${fmt(dueOverdueTotal)} outstanding</p>
+      </div>
+      <div class="border border-gray-200 rounded-xl p-5">
+        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Paid this month</p>
+        <p class="text-3xl font-bold mt-1 text-green-700">{paidThisMonth.length} charges</p>
+        <p class="text-xs text-gray-400 mt-1">${fmt(paidThisMonthTotal)} collected</p>
+      </div>
+      <div class="border border-gray-200 rounded-xl p-5">
+        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Open maintenance</p>
+        <p class="text-3xl font-bold mt-1 text-red-600">{openRequests.length}</p>
+        <p class="text-xs text-gray-400 mt-1">new / acknowledged / in progress</p>
+      </div>
+      <div class="border border-gray-200 rounded-xl p-5">
+        <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Unread messages</p>
+        <p class="text-3xl font-bold mt-1">{unreadMessages.length}</p>
+        <p class="text-xs text-gray-400 mt-1">from tenants (tenant side)</p>
+      </div>
+    </div>
+
+    <!-- Quick links -->
+    <div class="border border-gray-200 rounded-xl p-6">
+      <h2 class="font-semibold text-lg mb-4">Quick links</h2>
+      <div class="flex flex-wrap gap-3">
+        <a href="/admin/tenants" class="inline-flex items-center gap-2 bg-[var(--color-brand)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-brand-dark)] transition">
+          View all tenants
+        </a>
+        <a href="/admin/tenants" class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:border-gray-400 transition">
+          View all charges
+        </a>
+        <a href="/admin/tenants" class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:border-gray-400 transition">
+          View open requests
+        </a>
+      </div>
+    </div>
+
+    <!-- Recent overdue alerts -->
+    {dueOverdue.filter(c => c.status === 'overdue').length > 0 && (
+      <div class="mt-6 border border-red-200 bg-red-50 rounded-xl p-5">
+        <h2 class="font-semibold text-red-900 mb-3">Overdue charges</h2>
+        <ul class="space-y-2">
+          {dueOverdue.filter(c => c.status === 'overdue').map((c) => {
+            const tenant = tenants.find(t => t.id === c.tenant_id)
+            return (
+              <li class="flex items-center justify-between text-sm">
+                <span class="text-red-800">
+                  <a href={`/admin/tenants/${c.tenant_id}`} class="font-medium hover:underline">{tenant?.name}</a>
+                  {' — '}{c.description}
+                </span>
+                <span class="font-medium text-red-900">${fmt(c.amount_cents)}</span>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    )}
+  </div>
+</Base>

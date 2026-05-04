@@ -1,12 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro'
 import PhotoGallery from '../../components/PhotoGallery.astro'
-import { listAvailableUnits, getUnitById } from '../../lib/data'
-
-export async function getStaticPaths() {
-  const units = await listAvailableUnits()
-  return units.map((u) => ({ params: { id: u.id } }))
-}
+import { getUnitById } from '../../lib/data'
 
 const { id } = Astro.params
 const unit = await getUnitById(id!)
