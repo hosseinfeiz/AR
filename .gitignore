@@ -8,6 +8,8 @@ dist/
 build/
 .next/
 .expo/
+.vercel/
+.astro/
 *.tsbuildinfo
 
 # env
