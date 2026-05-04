@@ -18,29 +18,26 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
-  # E2E job is gated until apps/lynx exists (Tasks 9-12 + 15).
-  # Uncomment when Lynx app is scaffolded and Playwright tests are in place.
-  #
-  # e2e:
-  #   runs-on: ubuntu-latest
-  #   needs: lint-typecheck-test
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: pnpm/action-setup@v4
-  #       with: { version: 9 }
-  #     - uses: actions/setup-node@v4
-  #       with: { node-version: 22, cache: pnpm }
-  #     - uses: supabase/setup-cli@v1
-  #       with: { version: latest }
-  #     - run: pnpm install --frozen-lockfile
-  #     - run: supabase start
-  #     - run: pnpm --filter @ar/lynx exec playwright install --with-deps chromium webkit
-  #     - run: pnpm --filter @ar/lynx dev &
-  #     - run: |
-  #         for i in {1..30}; do curl -sSf http://localhost:3000 > /dev/null && break; sleep 2; done
-  #     - run: pnpm --filter @ar/lynx test:e2e
-  #     - if: failure()
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: playwright-report
-  #         path: apps/lynx/playwright-report/
+  e2e:
+    runs-on: ubuntu-latest
+    needs: lint-typecheck-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ar/web exec playwright install --with-deps chromium webkit
+      - run: pnpm --filter @ar/web build
+      - name: Run E2E
+        run: pnpm --filter @ar/web test:e2e
+        env:
+          PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
