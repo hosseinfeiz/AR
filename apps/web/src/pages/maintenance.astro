@@ -1,0 +1,25 @@
+---
+export const prerender = false
+import Base from '../layouts/Base.astro'
+import { MaintenanceForm } from '../components/islands/MaintenanceForm'
+import { supabase } from '../lib/supabase'
+import { clientEnv } from '../lib/env'
+
+const { data: buildings = [] } = await supabase
+  .from('buildings').select('id, name').eq('is_published', true).order('name')
+---
+<Base title="Submit a maintenance request" description="Tell us about a maintenance issue at your AR Management apartment.">
+  <section class="max-w-2xl mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold">Maintenance request</h1>
+    <p class="mt-2 text-gray-600">Existing residents — let us know what needs attention.</p>
+    <div class="mt-6">
+      <MaintenanceForm
+        client:load
+        supabaseUrl={clientEnv.VITE_SUPABASE_URL}
+        anonKey={clientEnv.VITE_SUPABASE_ANON_KEY}
+        turnstileSiteKey={clientEnv.VITE_TURNSTILE_SITE_KEY}
+        buildings={buildings}
+      />
+    </div>
+  </section>
+</Base>
