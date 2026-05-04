@@ -1,0 +1,7 @@
+# Cloudflare Pages — referenced by the @astrojs/cloudflare adapter.
+# This file lives at the project root (apps/web/) so wrangler can find it
+# when CF Pages runs the build with Root Directory = apps/web.
+name = "ar-management-web"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
