@@ -11,7 +11,7 @@ if (session) {
 
 const redirect = Astro.url.searchParams.get('redirect') ?? undefined
 ---
-<Base title="Sign in — AR Management" description="Sign in to the AR Management tenant portal or admin dashboard.">
+<Base title="Sign in — A &amp; R Management" description="Sign in to the A &amp; R Management tenant portal or admin dashboard.">
   <section class="min-h-[70vh] flex items-center justify-center px-4 py-12">
     <LoginForm client:load redirect={redirect} />
   </section>

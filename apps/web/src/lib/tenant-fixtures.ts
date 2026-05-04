@@ -367,7 +367,7 @@ export const messages: Message[] = [
   {
     id: 'msg-sj-001',
     tenant_id: 'tenant-0001-0000-0000-000000000001',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Welcome to Grass Lake Manor!',
     body: `Dear Sarah,
 
@@ -381,7 +381,7 @@ A few reminders:
 Don't hesitate to reach out with any questions.
 
 Warm regards,
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2025-08-28T09:00:00Z',
     read: true,
     category: 'announcement',
@@ -389,7 +389,7 @@ AR Management Office`,
   {
     id: 'msg-sj-002',
     tenant_id: 'tenant-0001-0000-0000-000000000001',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Payment receipt — October 2025 rent',
     body: `Hi Sarah,
 
@@ -402,7 +402,7 @@ Date: October 2, 2025
 
 Thank you for your timely payment!
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2025-10-02T14:30:00Z',
     read: true,
     category: 'payment',
@@ -410,7 +410,7 @@ AR Management Office`,
   {
     id: 'msg-sj-003',
     tenant_id: 'tenant-0001-0000-0000-000000000001',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Building hallway lighting upgrade — April 28',
     body: `Dear Residents,
 
@@ -418,7 +418,7 @@ We will be replacing the hallway lighting fixtures on floors 2 and 3 on Monday, 
 
 If you have questions, please reply to this message.
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-04-24T10:00:00Z',
     read: false,
     category: 'announcement',
@@ -428,7 +428,7 @@ AR Management Office`,
   {
     id: 'msg-ml-001',
     tenant_id: 'tenant-0002-0000-0000-000000000002',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Lease renewal reminder',
     body: `Hi Marcus,
 
@@ -438,7 +438,7 @@ Please let us know by July 1st whether you'd like to renew for another 12 months
 
 Feel free to call us at (612) 555-0142 or reply to this message.
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-04-15T11:00:00Z',
     read: true,
     category: 'lease',
@@ -446,7 +446,7 @@ AR Management Office`,
   {
     id: 'msg-ml-002',
     tenant_id: 'tenant-0002-0000-0000-000000000002',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Late payment notice — April 2026 rent',
     body: `Dear Marcus,
 
@@ -454,7 +454,7 @@ Our records show that your April 2026 rent of $1,425.00 was due on April 1st and
 
 Please submit payment as soon as possible through the tenant portal or contact us to make arrangements.
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-04-07T09:00:00Z',
     read: true,
     category: 'payment',
@@ -462,7 +462,7 @@ AR Management Office`,
   {
     id: 'msg-ml-003',
     tenant_id: 'tenant-0002-0000-0000-000000000002',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Maintenance update — kitchen faucet (REF: BCDX4421)',
     body: `Hi Marcus,
 
@@ -470,7 +470,7 @@ Your maintenance request regarding the dripping kitchen faucet (ref BCDX4421) ha
 
 You do not need to be home — we have building access. We'll leave a completion note on your door.
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-05-01T15:00:00Z',
     read: false,
     category: 'maintenance',
@@ -480,7 +480,7 @@ AR Management Office`,
   {
     id: 'msg-er-001',
     tenant_id: 'tenant-0003-0000-0000-000000000003',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Summer property update — May 2026',
     body: `Dear Residents,
 
@@ -492,7 +492,7 @@ As we head into summer, a few updates from the management team:
 
 Thank you for being great residents!
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-05-02T08:00:00Z',
     read: false,
     category: 'announcement',
@@ -500,7 +500,7 @@ AR Management Office`,
   {
     id: 'msg-er-002',
     tenant_id: 'tenant-0003-0000-0000-000000000003',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Payment receipt — September 2025 rent',
     body: `Hi Emma,
 
@@ -511,7 +511,7 @@ Amount: $1,250.00
 Method: ACH transfer
 Date: September 2, 2025
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2025-09-02T13:00:00Z',
     read: true,
     category: 'payment',
@@ -519,7 +519,7 @@ AR Management Office`,
   {
     id: 'msg-er-003',
     tenant_id: 'tenant-0003-0000-0000-000000000003',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Maintenance resolved — bathroom exhaust fan',
     body: `Hi Emma,
 
@@ -527,7 +527,7 @@ We're happy to let you know that the bathroom exhaust fan replacement in unit #1
 
 If you experience any further issues, please submit a new request through the tenant portal.
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-03-15T16:00:00Z',
     read: true,
     category: 'maintenance',
@@ -537,7 +537,7 @@ AR Management Office`,
   {
     id: 'msg-pp-001',
     tenant_id: 'tenant-0004-0000-0000-000000000004',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Welcome to Winnetka Manor!',
     body: `Dear Priya,
 
@@ -548,7 +548,7 @@ Your unit #1C has original hardwood floors and a courtyard-facing window — we 
 Laundry room is on the lower level. Parking spot #3 is yours.
 
 Looking forward to having you,
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2025-12-28T10:00:00Z',
     read: true,
     category: 'announcement',
@@ -556,7 +556,7 @@ AR Management Office`,
   {
     id: 'msg-pp-002',
     tenant_id: 'tenant-0004-0000-0000-000000000004',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Payment receipt — February 2026 rent',
     body: `Hi Priya,
 
@@ -567,7 +567,7 @@ Amount: $1,325.00
 Method: Card
 Date: February 2, 2026
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-02-02T12:00:00Z',
     read: true,
     category: 'payment',
@@ -575,7 +575,7 @@ AR Management Office`,
   {
     id: 'msg-pp-003',
     tenant_id: 'tenant-0004-0000-0000-000000000004',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Hallway carpet cleaning — May 8',
     body: `Dear Winnetka Manor Residents,
 
@@ -583,7 +583,7 @@ The hallway carpets on floors 1–3 will be professionally cleaned on Friday, Ma
 
 Apologies for any inconvenience!
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-05-03T09:30:00Z',
     read: false,
     category: 'announcement',
@@ -593,7 +593,7 @@ AR Management Office`,
   {
     id: 'msg-dc-001',
     tenant_id: 'tenant-0005-0000-0000-000000000005',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Move-in checklist — unit #4A',
     body: `Hi David,
 
@@ -607,7 +607,7 @@ Key items to check:
 
 Reply to this message or drop the form at the office.
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2025-11-01T09:00:00Z',
     read: true,
     category: 'lease',
@@ -615,7 +615,7 @@ AR Management Office`,
   {
     id: 'msg-dc-002',
     tenant_id: 'tenant-0005-0000-0000-000000000005',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Payment receipt — December 2025 rent',
     body: `Hi David,
 
@@ -626,7 +626,7 @@ Amount: $2,250.00
 Method: ACH transfer
 Date: December 2, 2025
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2025-12-02T14:00:00Z',
     read: true,
     category: 'payment',
@@ -634,7 +634,7 @@ AR Management Office`,
   {
     id: 'msg-dc-003',
     tenant_id: 'tenant-0005-0000-0000-000000000005',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Balcony inspection reminder',
     body: `Hi David,
 
@@ -642,7 +642,7 @@ As part of our annual spring inspection, we'll be checking all fourth-floor balc
 
 If that time doesn't work, please reply and we'll reschedule.
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-05-01T11:00:00Z',
     read: false,
     category: 'general',
@@ -652,7 +652,7 @@ AR Management Office`,
   {
     id: 'msg-ja-001',
     tenant_id: 'tenant-0006-0000-0000-000000000006',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Welcome to Winnetka Manor!',
     body: `Dear James,
 
@@ -660,7 +660,7 @@ We're thrilled to welcome you to unit #2B starting December 1st. Your unit featu
 
 Parking: spot #7. Laundry: lower level. Office hours: Mon–Fri, 9 AM – 5 PM.
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2025-11-26T10:00:00Z',
     read: true,
     category: 'announcement',
@@ -668,7 +668,7 @@ AR Management Office`,
   {
     id: 'msg-ja-002',
     tenant_id: 'tenant-0006-0000-0000-000000000006',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'Payment receipt — January 2026 rent',
     body: `Hi James,
 
@@ -679,7 +679,7 @@ Amount: $1,850.00
 Method: Card
 Date: January 3, 2026
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-01-03T13:00:00Z',
     read: true,
     category: 'payment',
@@ -687,7 +687,7 @@ AR Management Office`,
   {
     id: 'msg-ja-003',
     tenant_id: 'tenant-0006-0000-0000-000000000006',
-    from_name: 'AR Management Office',
+    from_name: 'A & R Management Office',
     subject: 'HVAC filter replacement — scheduled May 15',
     body: `Hi James,
 
@@ -695,7 +695,7 @@ As part of our seasonal maintenance, we'll be replacing the HVAC filters in all 
 
 No action needed on your end — we have building access.
 
-AR Management Office`,
+A & R Management Office`,
     sent_at: '2026-05-02T10:00:00Z',
     read: false,
     category: 'maintenance',

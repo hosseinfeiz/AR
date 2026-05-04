@@ -42,13 +42,13 @@ const paidThisMonthTotal = paidThisMonth.reduce((s, c) => s + c.amount_cents, 0)
 const openRequests = tenantRequests.filter((r) => r.status === 'new' || r.status === 'acknowledged' || r.status === 'in_progress')
 const unreadMessages = messages.filter((m) => !m.read)
 ---
-<Base title="Admin Dashboard — AR Management">
+<Base title="Admin Dashboard — A &amp; R Management">
   <AdminNav />
   <div class="max-w-5xl mx-auto px-4 py-10">
     <div class="flex items-center justify-between mb-8">
       <div>
         <h1 class="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-        <p class="text-gray-500 mt-1">AR Management — overview</p>
+        <p class="text-gray-500 mt-1">A &amp; R Management — overview</p>
       </div>
       <a href="/" class="text-sm text-gray-500 hover:text-gray-800">← Back to site</a>
     </div>

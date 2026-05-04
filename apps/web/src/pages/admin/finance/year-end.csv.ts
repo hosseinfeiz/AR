@@ -29,7 +29,7 @@ export const GET: APIRoute = ({ request, cookies }) => {
   const safeYear = validYears.includes(year) ? year : 2025
 
   const lines: string[] = []
-  lines.push(`AR Management — Year-End Summary Packet`)
+  lines.push(`A & R Management — Year-End Summary Packet`)
   lines.push(`Tax Year,${safeYear}`)
   lines.push(`Generated,May 4 2026`)
   lines.push(``)

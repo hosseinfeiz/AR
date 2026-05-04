@@ -37,7 +37,7 @@ export const GET: APIRoute = ({ request, cookies }) => {
     : 'All properties'
 
   const lines: string[] = []
-  lines.push(`AR Management — Schedule E / P&L Report`)
+  lines.push(`A & R Management — Schedule E / P&L Report`)
   lines.push(`Tax Year,${safeYear}`)
   lines.push(`Property,${escapeCsv(buildingLabel)}`)
   lines.push(`Generated,May 4 2026`)

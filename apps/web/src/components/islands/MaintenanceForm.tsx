@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { MaintenanceRequestInputSchema, type MaintenanceRequestInput } from '@ar/shared'
-import { createClient } from '@supabase/supabase-js'
 import { TurnstileWidget } from './TurnstileWidget'
 import { PhotoUploader } from './PhotoUploader'
 
@@ -14,20 +13,9 @@ interface Props {
   mockMode?: boolean
 }
 
-function mockRefId(): string {
-  const a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-  return Array.from({ length: 8 }, () => a[Math.floor(Math.random() * a.length)]).join('')
-}
-
 const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v)
 
 export function MaintenanceForm({ supabaseUrl, anonKey, turnstileSiteKey, buildings, mockMode = false }: Props) {
-  // Use placeholders when env isn't set so SSR doesn't throw "supabaseUrl is required".
-  // Real submissions only happen when !mockMode and the user-provided env is valid.
-  const supabase = createClient(
-    supabaseUrl || 'https://placeholder.supabase.co',
-    anonKey || 'placeholder-anon-key',
-  )
   const [turnstile, setTurnstile] = useState<string | null>(mockMode ? 'dev-mock-token' : null)
   const [photoPaths, setPhotoPaths] = useState<string[]>([])
   const [submitted, setSubmitted] = useState<{ ref_id: string } | null>(null)
@@ -70,15 +58,22 @@ export function MaintenanceForm({ supabaseUrl, anonKey, turnstileSiteKey, buildi
 
   async function onSubmit(values: MaintenanceRequestInput) {
     setSubmitError(null)
-    if (mockMode) {
-      await new Promise((r) => setTimeout(r, 500))
-      setSubmitted({ ref_id: mockRefId() })
-      return
+    try {
+      const res = await fetch('/api/maintenance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string }
+        setSubmitError(err.error ?? `Submission failed (${res.status}). Please try again.`)
+        return
+      }
+      const data = await res.json() as { ref_id: string }
+      setSubmitted({ ref_id: data.ref_id })
+    } catch (e) {
+      setSubmitError((e as Error).message ?? 'Network error. Please try again.')
     }
-    const { turnstile_token, ...payload } = values
-    const { data, error } = await supabase.from('maintenance_requests').insert(payload).select('ref_id').single()
-    if (error) { setSubmitError(error.message); return }
-    setSubmitted({ ref_id: data!.ref_id })
   }
 
   if (submitted) {
