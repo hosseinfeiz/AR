@@ -1,0 +1,20 @@
+---
+const links = [
+  { href: '/', label: 'Home' },
+  { href: '/listings', label: 'Listings' },
+  { href: '/maintenance', label: 'Maintenance' },
+  { href: '/about', label: 'About' },
+  { href: '/contact', label: 'Contact' },
+]
+---
+<header class="border-b border-gray-200 bg-white sticky top-0 z-10">
+  <nav class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <a href="/" class="text-xl font-bold tracking-tight">AR Management</a>
+    <ul class="hidden sm:flex gap-6 text-sm">
+      {links.slice(1).map((l) => (
+        <li><a href={l.href} class="text-gray-700 hover:text-[var(--color-brand)]">{l.label}</a></li>
+      ))}
+    </ul>
+    <a href="/schedule" class="hidden sm:inline-flex bg-[var(--color-brand)] text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-[var(--color-brand-dark)]">Schedule a showing</a>
+  </nav>
+</header>

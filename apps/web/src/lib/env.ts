@@ -1,11 +1,22 @@
 import { ClientEnvSchema, ServerEnvSchema } from '@ar/shared'
 
-export const clientEnv = ClientEnvSchema.parse({
+// Use safeParse so missing env vars during build don't throw at module load time.
+// At runtime (dev/production) the required vars must be set or Supabase calls will fail.
+const _clientEnvResult = ClientEnvSchema.safeParse({
   VITE_SUPABASE_URL: import.meta.env.PUBLIC_SUPABASE_URL,
   VITE_SUPABASE_ANON_KEY: import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
   VITE_TURNSTILE_SITE_KEY: import.meta.env.PUBLIC_TURNSTILE_SITE_KEY,
   VITE_SENTRY_DSN: import.meta.env.PUBLIC_SENTRY_DSN,
 })
+
+export const clientEnv = _clientEnvResult.success
+  ? _clientEnvResult.data
+  : {
+      VITE_SUPABASE_URL: import.meta.env.PUBLIC_SUPABASE_URL ?? '',
+      VITE_SUPABASE_ANON_KEY: import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? '',
+      VITE_TURNSTILE_SITE_KEY: import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? '',
+      VITE_SENTRY_DSN: import.meta.env.PUBLIC_SENTRY_DSN as string | undefined,
+    }
 
 export function serverEnv() {
   return ServerEnvSchema.parse({

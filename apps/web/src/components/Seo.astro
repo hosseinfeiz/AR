@@ -1,0 +1,29 @@
+---
+interface Props {
+  title: string
+  description?: string
+  canonical?: string
+  image?: string
+  jsonLd?: object
+}
+const { title, description, canonical, image, jsonLd } = Astro.props
+const siteName = 'AR Management'
+const fullTitle = title.includes(siteName) ? title : `${title} | ${siteName}`
+const url = canonical ?? Astro.url.href
+const ogImage = image ?? `${Astro.site}og-default.png`
+---
+<title>{fullTitle}</title>
+{description && <meta name="description" content={description} />}
+<link rel="canonical" href={url} />
+<meta property="og:title" content={fullTitle} />
+{description && <meta property="og:description" content={description} />}
+<meta property="og:type" content="website" />
+<meta property="og:url" content={url} />
+<meta property="og:image" content={ogImage} />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={fullTitle} />
+{description && <meta name="twitter:description" content={description} />}
+<meta name="twitter:image" content={ogImage} />
+{jsonLd && (
+  <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+)}
