@@ -41,3 +41,7 @@ test-results/
 *.pem
 *.key
 service-account*.json
+
+# stray screenshots dropped in repo root
+/1.png
+/2.png
