@@ -2,12 +2,12 @@
 
 ## One-time setup (user action required)
 
-1. Create Vercel account, link this GitHub repo, import as new project. Project root: `apps/lynx`.
+1. Create Vercel account, link this GitHub repo, import as new project. Project root: `apps/web`. Framework preset: Astro.
 2. Set Vercel env vars (Production scope):
-   - `VITE_SUPABASE_URL`         — the production Supabase URL
-   - `VITE_SUPABASE_ANON_KEY`    — production anon key
-   - `VITE_TURNSTILE_SITE_KEY`   — Cloudflare Turnstile production key
-   - `VITE_SENTRY_DSN`           — Sentry project DSN
+   - `PUBLIC_SUPABASE_URL`         — the production Supabase URL
+   - `PUBLIC_SUPABASE_ANON_KEY`    — production anon key
+   - `PUBLIC_TURNSTILE_SITE_KEY`   — Cloudflare Turnstile production key
+   - `PUBLIC_SENTRY_DSN`           — Sentry project DSN
 3. Create production Supabase project (`ar-mgmt-prod`) at supabase.com, US-East.
 4. From repo root: `supabase link --project-ref <prod-ref>` then `supabase db push` to apply migrations.
 5. Apply seed: `psql "<prod-db-url>" < supabase/seed.sql` (after editing real addresses + manager emails).

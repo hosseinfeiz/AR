@@ -28,11 +28,7 @@
 - [ ] Sentry receiving events (manually trigger an error)
 
 ## Mobile
-- [ ] EAS production build succeeded for iOS and Android
-- [ ] TestFlight build distributed to internal testers
-- [ ] Play Internal Track build distributed
-- [ ] Mobile QA matrix completed (4 devices × 9 checklist items)
-- [ ] Submitted to App Store and Play Store with real screenshots + listings copy
+Mobile app deferred to Sub-project #1.5 (`apps/lynx/` is parked).
 
 ## Observability
 - [ ] BetterStack (or Vercel uptime) monitoring `/api/health` every minute
