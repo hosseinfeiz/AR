@@ -39,7 +39,11 @@ const jsonLd = {
   },
 }
 
-const photos = (unit.unit_photos ?? []).sort((a, b) => a.sort_order - b.sort_order)
+// Prefer unit photos; fall back to the parent building's hero so the unit page
+// is never photo-empty.
+const ownPhotos = (unit.unit_photos ?? []).sort((a, b) => a.sort_order - b.sort_order)
+const fallbackPhotos = (unit.building.building_photos ?? []).sort((a, b) => a.sort_order - b.sort_order)
+const photos = ownPhotos.length > 0 ? ownPhotos : fallbackPhotos
 ---
 <Base
   title={`Unit ${unit.unit_number} at ${unit.building.name} — $${(unit.monthly_rent_cents/100).toLocaleString()}/mo`}
@@ -54,7 +58,16 @@ const photos = (unit.unit_photos ?? []).sort((a, b) => a.sort_order - b.sort_ord
 
   {photos.length > 0 && (
     <section class="max-w-5xl mx-auto px-4 pb-6">
-      <PhotoGallery photos={photos} />
+      <img
+        src={photos[0]!.storage_path}
+        alt={photos[0]!.alt_text}
+        class="w-full max-h-[480px] object-cover rounded-xl"
+      />
+      {photos.length > 1 && (
+        <div class="mt-3">
+          <PhotoGallery photos={photos.slice(1)} />
+        </div>
+      )}
     </section>
   )}
 

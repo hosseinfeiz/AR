@@ -29,7 +29,16 @@ const photos = (building.building_photos ?? []).sort((a, b) => a.sort_order - b.
 
   {photos.length > 0 && (
     <section class="max-w-5xl mx-auto px-4 pb-8">
-      <PhotoGallery photos={photos} />
+      <img
+        src={photos[0]!.storage_path}
+        alt={photos[0]!.alt_text}
+        class="w-full max-h-[480px] object-cover rounded-xl"
+      />
+      {photos.length > 1 && (
+        <div class="mt-3">
+          <PhotoGallery photos={photos.slice(1)} />
+        </div>
+      )}
     </section>
   )}
 

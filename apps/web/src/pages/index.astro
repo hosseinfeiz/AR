@@ -12,12 +12,25 @@ const buildings = await listBuildings()
     <p class="mt-3 text-gray-600 max-w-2xl">Quality apartment living at Grass Lake Manor and Winnetka Manor. Browse listings, schedule a tour, or report a maintenance issue.</p>
   </section>
   <section class="max-w-5xl mx-auto px-4 grid sm:grid-cols-2 gap-6 pb-12">
-    {buildings.map((b) => (
-      <a href={`/buildings/${b.slug}`} class="border border-gray-200 rounded-xl p-6 hover:border-[var(--color-brand)] transition">
-        <h2 class="text-xl font-semibold">{b.name}</h2>
-        <p class="text-gray-600 mt-1">{b.address_line1}, {b.city}, {b.state}</p>
-        <p class="text-[var(--color-brand)] mt-3 font-medium">View units →</p>
-      </a>
-    ))}
+    {buildings.map((b) => {
+      const hero = (b.building_photos ?? [])[0]
+      return (
+        <a href={`/buildings/${b.slug}`} class="block border border-gray-200 rounded-xl overflow-hidden hover:border-[var(--color-brand)] transition group">
+          {hero && (
+            <img
+              src={hero.storage_path.startsWith('/') || hero.storage_path.startsWith('http') ? hero.storage_path : `/buildings/${b.slug}.png`}
+              alt={hero.alt_text}
+              loading="lazy"
+              class="w-full h-56 object-cover group-hover:scale-[1.02] transition"
+            />
+          )}
+          <div class="p-6">
+            <h2 class="text-xl font-semibold">{b.name}</h2>
+            <p class="text-gray-600 mt-1">{b.address_line1}, {b.city}, {b.state} {b.postal_code}</p>
+            <p class="text-[var(--color-brand)] mt-3 font-medium">View units →</p>
+          </div>
+        </a>
+      )
+    })}
   </section>
 </Base>

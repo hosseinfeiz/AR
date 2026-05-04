@@ -2,14 +2,28 @@
 import { transformedPhotoUrl } from '../lib/photo-url'
 import { clientEnv } from '../lib/env'
 interface Photo { storage_path: string; alt_text: string }
-interface Props { photos: Photo[] }
-const { photos } = Astro.props
+interface Props { photos: Photo[]; columns?: 1 | 2 | 3 }
+const { photos, columns = 3 } = Astro.props
+
+function resolveSrc(path: string): string {
+  // Local public asset (starts with `/`) or absolute URL — use as-is.
+  if (path.startsWith('/') || path.startsWith('http')) return path
+  // Otherwise treat as a Supabase storage object and use the transform endpoint.
+  return transformedPhotoUrl(clientEnv.VITE_SUPABASE_URL, path, { width: 1200, quality: 80, format: 'webp' })
+}
+
+const gridCls =
+  columns === 1
+    ? 'grid grid-cols-1 gap-2'
+    : columns === 2
+      ? 'grid grid-cols-1 sm:grid-cols-2 gap-2'
+      : 'grid grid-cols-2 sm:grid-cols-3 gap-2'
 ---
 {photos.length === 0 ? null : (
-  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+  <div class={gridCls}>
     {photos.map((p) => (
       <img
-        src={transformedPhotoUrl(clientEnv.VITE_SUPABASE_URL, p.storage_path, { width: 800, quality: 75, format: 'webp' })}
+        src={resolveSrc(p.storage_path)}
         alt={p.alt_text}
         loading="lazy"
         class="rounded-lg object-cover w-full aspect-[4/3]"
