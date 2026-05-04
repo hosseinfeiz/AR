@@ -19,7 +19,11 @@ if (bedsFilter !== null && bedsFilter !== '') q = q.eq('bedrooms', Number(bedsFi
 if (maxRent) q = q.lte('monthly_rent_cents', Number(maxRent) * 100)
 
 const { data: unitsData } = await q
-const units = unitsData ?? []
+// Supabase returns joined relations as arrays; normalize building to a single object
+const units = (unitsData ?? []).map((u) => ({
+  ...u,
+  building: Array.isArray(u.building) ? u.building[0] : u.building,
+}))
 
 const { data: buildingsData } = await supabase
   .from('buildings').select('id, slug, name').eq('is_published', true).order('name')
