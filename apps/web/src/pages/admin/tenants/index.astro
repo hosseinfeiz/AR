@@ -1,6 +1,7 @@
 ---
 export const prerender = false
 import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
 import { getSession } from '../../../lib/auth'
 import { tenants, leases, charges } from '../../../lib/tenant-fixtures'
 import { buildings } from '../../../lib/fixtures'
@@ -31,6 +32,7 @@ const rows = tenants.map((t) => {
 })
 ---
 <Base title="Tenants — Admin — AR Management">
+  <AdminNav />
   <div class="max-w-5xl mx-auto px-4 py-10">
     <div class="flex items-center justify-between mb-8">
       <div>

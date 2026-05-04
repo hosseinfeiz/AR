@@ -1,0 +1,195 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import {
+  vendors,
+  vendorYtdTotal,
+  vendor1099Candidates,
+  EXPENSE_CATEGORY_LABELS,
+} from '../../../lib/finance-fixtures'
+import { fmtCurrency } from '../../../lib/finance-data'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/finance/tax')
+}
+
+const url = new URL(Astro.request.url)
+const filterYear = parseInt(url.searchParams.get('year') ?? '2025', 10)
+const validYears = [2024, 2025, 2026]
+const year = validYears.includes(filterYear) ? filterYear : 2025
+
+// Build vendor rows with YTD totals
+const vendorRows = vendors.map((v) => ({
+  vendor: v,
+  total_cents: vendorYtdTotal(v.id, year),
+  needs1099: !v.is_corporation && vendorYtdTotal(v.id, year) > 60000,
+}))
+
+const candidates = vendor1099Candidates(year)
+---
+<Base title={`Tax / 1099 — Finance — Admin — ${year}`}>
+  <AdminNav />
+  <div class="max-w-5xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <p class="text-sm text-gray-500 mb-1">
+          <a href="/admin" class="hover:underline">Admin</a> /
+          <a href="/admin/finance" class="hover:underline">Finance</a> / Tax &amp; 1099
+        </p>
+        <h1 class="text-2xl font-bold tracking-tight">Tax / 1099 Tracking</h1>
+      </div>
+    </div>
+
+    <!-- Year selector -->
+    <div class="border border-gray-200 rounded-xl p-4 bg-white mb-6">
+      <form method="get" class="flex gap-3 items-end">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Tax year</label>
+          <select name="year" class="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white">
+            {validYears.map((y) => (
+              <option value={y} selected={y === year}>{y}</option>
+            ))}
+          </select>
+        </div>
+        <button type="submit" class="bg-[var(--color-brand)] text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-[var(--color-brand-dark)]">
+          Apply
+        </button>
+      </form>
+    </div>
+
+    <!-- 1099 candidates highlight -->
+    {candidates.length > 0 && (
+      <div class="border border-amber-200 bg-amber-50 rounded-xl p-5 mb-6">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h2 class="font-semibold text-amber-900">
+              1099-NEC Required — {year}
+            </h2>
+            <p class="text-sm text-amber-700 mt-0.5">
+              Non-corporation vendors paid more than $600 this year. File a 1099-NEC for each.
+            </p>
+          </div>
+          <a
+            href={`/admin/finance/year-end.csv?year=${year}`}
+            class="inline-flex items-center gap-1.5 bg-amber-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-amber-800 transition"
+          >
+            ↓ Year-end packet (CSV)
+          </a>
+        </div>
+        <div class="bg-white rounded-lg border border-amber-200 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-amber-50 border-b border-amber-200">
+                <th class="text-left px-4 py-2 font-semibold text-amber-900">Vendor</th>
+                <th class="text-left px-4 py-2 font-semibold text-amber-900">Category</th>
+                <th class="text-left px-4 py-2 font-semibold text-amber-900">EIN / SSN last 4</th>
+                <th class="text-right px-4 py-2 font-semibold text-amber-900">Total paid {year}</th>
+                <th class="text-center px-4 py-2 font-semibold text-amber-900">Form</th>
+              </tr>
+            </thead>
+            <tbody>
+              {candidates.map(({ vendor, total_cents }) => (
+                <tr class="border-b border-amber-100">
+                  <td class="px-4 py-2.5 font-medium">{vendor.name}</td>
+                  <td class="px-4 py-2.5 text-gray-600">{EXPENSE_CATEGORY_LABELS[vendor.category]}</td>
+                  <td class="px-4 py-2.5 font-mono text-sm">
+                    {vendor.ein_or_ssn_last4 ? `****${vendor.ein_or_ssn_last4}` : <span class="text-red-600 text-xs">Missing — collect W-9</span>}
+                  </td>
+                  <td class="px-4 py-2.5 text-right font-bold">{fmtCurrency(total_cents)}</td>
+                  <td class="px-4 py-2.5 text-center">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                      1099-NEC
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs text-amber-700 mt-2">
+          Tip: Obtain a signed W-9 from each vendor. File 1099-NEC forms by January 31 of the following year.
+        </p>
+      </div>
+    )}
+
+    {candidates.length === 0 && (
+      <div class="border border-green-200 bg-green-50 rounded-xl p-4 mb-6">
+        <p class="font-medium text-green-900">No 1099-NEC candidates for {year}</p>
+        <p class="text-sm text-green-700 mt-0.5">No non-corporation vendors exceeded the $600 threshold.</p>
+      </div>
+    )}
+
+    <!-- Full vendor table -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden mb-8">
+      <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+        <h2 class="font-semibold text-gray-800">All vendors — {year} payments</h2>
+        <p class="text-xs text-gray-500 mt-0.5">
+          Corporations and government entities are exempt from 1099 reporting.
+        </p>
+      </div>
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200">
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Vendor</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Category</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">EIN / SSN last 4</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-700">Corporation?</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-700">YTD {year}</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-700">Needs 1099?</th>
+          </tr>
+        </thead>
+        <tbody>
+          {vendorRows.map(({ vendor, total_cents, needs1099 }) => (
+            <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+              <td class="px-4 py-3 font-medium">{vendor.name}</td>
+              <td class="px-4 py-3 text-gray-600 text-xs">{EXPENSE_CATEGORY_LABELS[vendor.category]}</td>
+              <td class="px-4 py-3 font-mono text-sm">
+                {vendor.ein_or_ssn_last4
+                  ? `****${vendor.ein_or_ssn_last4}`
+                  : <span class="text-gray-400">—</span>}
+              </td>
+              <td class="px-4 py-3 text-center">
+                {vendor.is_corporation
+                  ? <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Yes</span>
+                  : <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">No</span>}
+              </td>
+              <td class="px-4 py-3 text-right font-medium">{total_cents > 0 ? fmtCurrency(total_cents) : <span class="text-gray-400">$0</span>}</td>
+              <td class="px-4 py-3 text-center">
+                {needs1099
+                  ? <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Yes</span>
+                  : <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">No</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Download packet -->
+    <div class="border border-gray-200 rounded-xl p-5 bg-white mb-6">
+      <h2 class="font-semibold text-gray-900 mb-1">Year-end packet</h2>
+      <p class="text-sm text-gray-600 mb-3">
+        Download a consolidated CSV with income summary, expenses by category, depreciation, NOI per building, and 1099 candidate list for {year}.
+      </p>
+      <a
+        href={`/admin/finance/year-end.csv?year=${year}`}
+        class="inline-flex items-center gap-1.5 bg-[var(--color-brand)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-brand-dark)] transition"
+      >
+        ↓ Download year-end summary ({year}) CSV
+      </a>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="border border-amber-200 bg-amber-50 rounded-lg p-4 text-xs text-amber-900 leading-relaxed">
+      <p class="font-semibold mb-1">Disclaimer</p>
+      <p>
+        This report is a draft generated from your AR Management records. It is not a tax filing
+        or a substitute for advice from a licensed CPA. Depreciation figures are placeholders
+        supplied for demo purposes. Consult a tax professional before filing.
+      </p>
+    </div>
+  </div>
+</Base>

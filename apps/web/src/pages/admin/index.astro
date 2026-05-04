@@ -1,6 +1,7 @@
 ---
 export const prerender = false
 import Base from '../../layouts/Base.astro'
+import AdminNav from '../../components/AdminNav.astro'
 import { getSession } from '../../lib/auth'
 import {
   tenants,
@@ -42,6 +43,7 @@ const openRequests = tenantRequests.filter((r) => r.status === 'new' || r.status
 const unreadMessages = messages.filter((m) => !m.read)
 ---
 <Base title="Admin Dashboard — AR Management">
+  <AdminNav />
   <div class="max-w-5xl mx-auto px-4 py-10">
     <div class="flex items-center justify-between mb-8">
       <div>

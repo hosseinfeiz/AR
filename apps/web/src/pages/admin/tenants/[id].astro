@@ -1,6 +1,7 @@
 ---
 export const prerender = false
 import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
 import { getSession } from '../../../lib/auth'
 import {
   findTenantById,
@@ -58,6 +59,7 @@ const statusPill: Record<string, string> = {
 }
 ---
 <Base title={`${tenant.name} — Admin — AR Management`}>
+  <AdminNav />
   <div class="max-w-5xl mx-auto px-4 py-10 space-y-8">
     <!-- Breadcrumb -->
     <div>

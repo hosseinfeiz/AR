@@ -1,0 +1,208 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import { getYearEndReport, fmtCurrency } from '../../../lib/finance-data'
+import {
+  EXPENSE_CATEGORY_LABELS,
+  SCHEDULE_E_LINE,
+  type ExpenseCategory,
+} from '../../../lib/finance-fixtures'
+import { buildings } from '../../../lib/fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/finance/reports')
+}
+
+const url = new URL(Astro.request.url)
+const filterYear = parseInt(url.searchParams.get('year') ?? '2025', 10)
+const filterBuilding = url.searchParams.get('building') ?? ''
+
+const validYears = [2024, 2025, 2026]
+const year = validYears.includes(filterYear) ? filterYear : 2025
+
+const buildingId = filterBuilding || undefined
+const report = getYearEndReport(year, buildingId)
+
+// Sort expense categories by Schedule E line number
+const catEntries = Object.entries(report.expense_breakdown) as [ExpenseCategory, number][]
+const sortedCats = catEntries
+  .filter(([, v]) => v > 0)
+  .sort(([a], [b]) => {
+    const lineA = parseInt(SCHEDULE_E_LINE[a].replace('Line ', ''), 10)
+    const lineB = parseInt(SCHEDULE_E_LINE[b].replace('Line ', ''), 10)
+    return lineA - lineB
+  })
+
+// CSV link
+const csvParams = new URLSearchParams({ year: String(year) })
+if (filterBuilding) csvParams.set('building', filterBuilding)
+const csvUrl = `/admin/finance/reports.csv?${csvParams.toString()}`
+
+const buildingLabel = buildingId
+  ? buildings.find((b) => b.id === buildingId)?.name ?? 'Unknown'
+  : 'All properties'
+
+function noi(cents: number): string {
+  return cents >= 0 ? fmtCurrency(cents) : `(${fmtCurrency(Math.abs(cents))})`
+}
+---
+<Base title={`Schedule E Report ${year} — Finance — Admin`}>
+  <AdminNav />
+  <div class="max-w-4xl mx-auto px-4 py-8 print:py-4 print:px-0">
+    <!-- Controls — hidden on print -->
+    <div class="flex items-center justify-between mb-6 print:hidden">
+      <div>
+        <p class="text-sm text-gray-500 mb-1">
+          <a href="/admin" class="hover:underline">Admin</a> /
+          <a href="/admin/finance" class="hover:underline">Finance</a> / Reports
+        </p>
+        <h1 class="text-2xl font-bold tracking-tight">Schedule E / P&L Report</h1>
+      </div>
+      <div class="flex gap-2">
+        <button
+          onclick="window.print()"
+          class="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:border-gray-400 transition"
+        >
+          Print
+        </button>
+        <a
+          href={csvUrl}
+          class="inline-flex items-center gap-1.5 border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:border-gray-400 transition"
+        >
+          ↓ Download CSV
+        </a>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="border border-gray-200 rounded-xl p-4 mb-6 bg-white print:hidden">
+      <form method="get" class="flex flex-wrap gap-3 items-end">
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Year</label>
+          <select name="year" class="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white">
+            {validYears.map((y) => (
+              <option value={y} selected={y === year}>{y}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Property</label>
+          <select name="building" class="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white">
+            <option value="">All properties</option>
+            {buildings.map((b) => (
+              <option value={b.id} selected={filterBuilding === b.id}>{b.name}</option>
+            ))}
+          </select>
+        </div>
+        <button type="submit" class="bg-[var(--color-brand)] text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-[var(--color-brand-dark)]">
+          Apply
+        </button>
+      </form>
+    </div>
+
+    <!-- Report — print-friendly -->
+    <div class="border border-gray-200 rounded-xl bg-white print:border-0 print:rounded-none">
+      <!-- Report header -->
+      <div class="px-6 py-5 border-b border-gray-200 print:border-b-2 print:border-black">
+        <div class="flex items-start justify-between">
+          <div>
+            <h2 class="text-xl font-bold text-gray-900">AR Management — Rental Income & Expenses</h2>
+            <p class="text-sm text-gray-600 mt-1">IRS Schedule E (Form 1040) — informational draft</p>
+            <p class="text-sm font-medium mt-0.5">Tax Year: {year} | Property: {buildingLabel}</p>
+          </div>
+          <div class="text-right text-xs text-gray-400 print:hidden">
+            <p>Generated: May 4, 2026</p>
+            <p class="mt-0.5 italic">DRAFT — not for filing</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-5">
+        <!-- Income section -->
+        <div class="mb-6">
+          <h3 class="text-sm font-bold uppercase tracking-wide text-gray-700 border-b border-gray-200 pb-1 mb-3">
+            Income
+          </h3>
+          <div class="flex items-center justify-between py-1.5">
+            <div>
+              <span class="text-sm text-gray-800">Rent received (Line 3)</span>
+            </div>
+            <span class="text-sm font-semibold tabular-nums">{fmtCurrency(report.income_cents)}</span>
+          </div>
+          <div class="flex items-center justify-between py-1.5 border-t border-gray-100">
+            <span class="text-sm font-bold text-gray-900">Total Income</span>
+            <span class="text-sm font-bold tabular-nums">{fmtCurrency(report.income_cents)}</span>
+          </div>
+        </div>
+
+        <!-- Expenses section -->
+        <div class="mb-6">
+          <h3 class="text-sm font-bold uppercase tracking-wide text-gray-700 border-b border-gray-200 pb-1 mb-3">
+            Expenses
+          </h3>
+          {sortedCats.map(([cat, amount]) => (
+            <div class="flex items-center justify-between py-1.5 border-b border-gray-50">
+              <div>
+                <span class="text-sm text-gray-800">{EXPENSE_CATEGORY_LABELS[cat]}</span>
+                <span class="ml-2 text-xs text-gray-400">{SCHEDULE_E_LINE[cat]}</span>
+              </div>
+              <span class="text-sm tabular-nums">{fmtCurrency(amount)}</span>
+            </div>
+          ))}
+
+          {/* Depreciation — separate, prominent */}
+          <div class="flex items-center justify-between py-2 border-b border-gray-200 mt-1">
+            <div>
+              <span class="text-sm text-gray-800">Depreciation (Line 18)</span>
+              <span class="ml-2 text-xs font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                Estimated — supplied by CPA
+              </span>
+            </div>
+            <span class="text-sm tabular-nums">{fmtCurrency(report.depreciation_cents)}</span>
+          </div>
+
+          <div class="flex items-center justify-between py-2 border-t border-gray-200 mt-1">
+            <span class="text-sm font-bold text-gray-900">Total Expenses</span>
+            <span class="text-sm font-bold tabular-nums">
+              {fmtCurrency(report.total_expenses_cents + report.depreciation_cents)}
+            </span>
+          </div>
+        </div>
+
+        <!-- Net rental income -->
+        <div class="bg-gray-50 rounded-lg px-4 py-3 mb-6">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-gray-900">Net Rental Real Estate Income (Loss)</span>
+            <span class={`font-bold text-lg tabular-nums ${
+              (report.noi_cents - report.depreciation_cents) >= 0 ? 'text-green-700' : 'text-red-700'
+            }`}>
+              {noi(report.noi_cents - report.depreciation_cents)}
+            </span>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Income − Total Expenses − Depreciation</p>
+        </div>
+
+        <!-- Disclaimer -->
+        <div class="border border-amber-200 bg-amber-50 rounded-lg p-4 text-xs text-amber-900 leading-relaxed">
+          <p class="font-semibold mb-1">Disclaimer</p>
+          <p>
+            This report is a draft generated from your AR Management records. It is not a tax filing
+            or a substitute for advice from a licensed CPA. Depreciation figures are placeholders
+            supplied for demo purposes. Consult a tax professional before filing.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</Base>
+
+<style>
+  @media print {
+    header, footer, nav {
+      display: none !important;
+    }
+  }
+</style>

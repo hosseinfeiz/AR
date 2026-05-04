@@ -1,0 +1,72 @@
+---
+// Admin navigation component — used at top of all /admin/* pages.
+// Highlights the active section based on current URL path.
+
+const pathname = Astro.url.pathname
+
+function isActive(prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(prefix + '/')
+}
+
+const mainTabs = [
+  { href: '/admin', label: 'Dashboard', exact: true },
+  { href: '/admin/tenants', label: 'Tenants' },
+  { href: '/admin/finance', label: 'Finance' },
+]
+
+const isFinance = isActive('/admin/finance')
+const financeTabs = [
+  { href: '/admin/finance', label: 'Overview', exact: true },
+  { href: '/admin/finance/income', label: 'Income' },
+  { href: '/admin/finance/expenses', label: 'Expenses' },
+  { href: '/admin/finance/reports', label: 'Reports' },
+  { href: '/admin/finance/tax', label: 'Tax / 1099' },
+]
+---
+<div class="border-b border-gray-200 bg-white print:hidden">
+  <div class="max-w-5xl mx-auto px-4">
+    <!-- Main tabs -->
+    <nav class="flex gap-1 pt-2" aria-label="Admin sections">
+      {mainTabs.map((tab) => {
+        const active = tab.exact ? pathname === tab.href : isActive(tab.href)
+        return (
+          <a
+            href={tab.href}
+            class={`px-4 py-2 text-sm font-medium rounded-t-lg border border-b-0 transition-colors ${
+              active
+                ? 'bg-white border-gray-200 text-[var(--color-brand)] -mb-px z-10'
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            {tab.label}
+          </a>
+        )
+      })}
+    </nav>
+  </div>
+
+  <!-- Finance sub-tabs -->
+  {isFinance && (
+    <div class="bg-gray-50 border-t border-gray-200">
+      <div class="max-w-5xl mx-auto px-4">
+        <nav class="flex gap-4 py-2" aria-label="Finance sub-sections">
+          {financeTabs.map((tab) => {
+            const active = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href)
+            return (
+              <a
+                href={tab.href}
+                class={`text-xs font-medium px-2 py-1 rounded transition-colors ${
+                  active
+                    ? 'text-[var(--color-brand)] bg-blue-50'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                {tab.label}
+              </a>
+            )
+          })}
+        </nav>
+      </div>
+    </div>
+  )}
+</div>

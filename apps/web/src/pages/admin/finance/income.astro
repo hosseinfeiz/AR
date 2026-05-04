@@ -1,0 +1,263 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import { getRentRoll, fmtCurrency, fmtDate, TODAY } from '../../../lib/finance-data'
+import { payments, charges, tenants } from '../../../lib/tenant-fixtures'
+import { buildings } from '../../../lib/fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/finance/income')
+}
+
+// Filters from query params
+const url = new URL(Astro.request.url)
+const filterBuilding = url.searchParams.get('building') ?? ''
+const filterFrom = url.searchParams.get('from') ?? ''
+const filterTo = url.searchParams.get('to') ?? ''
+
+// Build rent roll
+const rentRoll = getRentRoll(TODAY)
+
+// Build payments table: join payment → charge → tenant
+interface PaymentRow {
+  id: string
+  date: string
+  tenant_name: string
+  building_name: string
+  unit_label: string
+  building_id: string
+  amount_cents: number
+  method: string
+  receipt_number: string
+}
+
+// Build charge → building_id map
+const chargeBuildingMap = new Map<string, string>()
+for (const t of tenants) {
+  const tenantCharges = charges.filter((c) => c.tenant_id === t.id)
+  for (const c of tenantCharges) {
+    chargeBuildingMap.set(c.id, t.building_id)
+  }
+}
+
+const allRows: PaymentRow[] = payments.map((p) => {
+  const tenant = tenants.find((t) => t.id === p.tenant_id)
+  const building_id = chargeBuildingMap.get(p.charge_id) ?? ''
+  const building = buildings.find((b) => b.id === building_id)
+  return {
+    id: p.id,
+    date: p.paid_at.slice(0, 10),
+    tenant_name: tenant?.name ?? 'Unknown',
+    building_name: building?.name ?? 'Unknown',
+    unit_label: tenant?.unit_label ?? '',
+    building_id,
+    amount_cents: p.amount_cents,
+    method: p.method.toUpperCase(),
+    receipt_number: p.receipt_number,
+  }
+}).sort((a, b) => b.date.localeCompare(a.date))
+
+// Apply filters
+const filteredRows = allRows.filter((r) => {
+  if (filterBuilding && r.building_id !== filterBuilding) return false
+  if (filterFrom && r.date < filterFrom) return false
+  if (filterTo && r.date > filterTo) return false
+  return true
+})
+
+// Late fee / overdue tracking
+const overdueCharges = charges.filter((c) => c.status === 'overdue')
+const overdueTotal = overdueCharges.reduce((s, c) => s + c.amount_cents, 0)
+
+// Build CSV query string
+const csvParams = new URLSearchParams()
+if (filterBuilding) csvParams.set('building', filterBuilding)
+if (filterFrom) csvParams.set('from', filterFrom)
+if (filterTo) csvParams.set('to', filterTo)
+const csvUrl = `/admin/finance/income.csv?${csvParams.toString()}`
+
+function statusPill(status: string) {
+  if (status === 'paid') return 'bg-green-100 text-green-800'
+  if (status === 'due') return 'bg-amber-100 text-amber-800'
+  if (status === 'overdue') return 'bg-red-100 text-red-800'
+  return 'bg-gray-100 text-gray-600'
+}
+
+function statusLabel(status: string) {
+  if (status === 'paid') return 'Paid'
+  if (status === 'due') return 'Due'
+  if (status === 'overdue') return 'Overdue'
+  return 'No charge'
+}
+---
+<Base title="Income — Finance — Admin — AR Management">
+  <AdminNav />
+  <div class="max-w-5xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <p class="text-sm text-gray-500 mb-1">
+          <a href="/admin" class="hover:underline">Admin</a> /
+          <a href="/admin/finance" class="hover:underline">Finance</a> / Income
+        </p>
+        <h1 class="text-2xl font-bold tracking-tight">Income</h1>
+      </div>
+      <a
+        href={csvUrl}
+        class="inline-flex items-center gap-1.5 border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:border-gray-400 transition"
+      >
+        ↓ Download CSV
+      </a>
+    </div>
+
+    <!-- Rent Roll -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden mb-8">
+      <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+        <h2 class="font-semibold text-gray-800">Rent roll — active leases</h2>
+        <p class="text-xs text-gray-500 mt-0.5">Current month status as of May 2026</p>
+      </div>
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200">
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Tenant</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Building / Unit</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-700">Monthly rent</th>
+            <th class="text-center px-4 py-3 font-semibold text-gray-700">May 2026 status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rentRoll.map((row) => (
+            <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+              <td class="px-4 py-3">
+                <a href={`/admin/tenants/${row.tenant_id}`} class="font-medium hover:text-[var(--color-brand)] hover:underline">
+                  {row.tenant_name}
+                </a>
+              </td>
+              <td class="px-4 py-3 text-gray-600 text-xs">{row.unit_label}</td>
+              <td class="px-4 py-3 text-right font-medium">{fmtCurrency(row.monthly_rent_cents)}</td>
+              <td class="px-4 py-3 text-center">
+                <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusPill(row.current_month_status)}`}>
+                  {statusLabel(row.current_month_status)}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr class="bg-gray-50">
+            <td class="px-4 py-3 font-semibold" colspan="2">Total</td>
+            <td class="px-4 py-3 text-right font-bold">{fmtCurrency(rentRoll.reduce((s, r) => s + r.monthly_rent_cents, 0))}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Late fee / overdue callout -->
+    {overdueCharges.length > 0 && (
+      <div class="border border-red-200 bg-red-50 rounded-xl p-4 mb-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="font-semibold text-red-900">Overdue charges</p>
+            <p class="text-sm text-red-700 mt-0.5">
+              {overdueCharges.length} charge{overdueCharges.length !== 1 ? 's' : ''} past due
+              — consider applying late fees (grace period policies apply)
+            </p>
+          </div>
+          <p class="text-lg font-bold text-red-900">{fmtCurrency(overdueTotal)}</p>
+        </div>
+        <ul class="mt-3 space-y-1">
+          {overdueCharges.map((c) => {
+            const t = tenants.find((t) => t.id === c.tenant_id)
+            return (
+              <li class="text-sm text-red-800">
+                <a href={`/admin/tenants/${c.tenant_id}`} class="font-medium hover:underline">{t?.name}</a>
+                {' — '}{c.description} ({fmtDate(c.due_date)}) — {fmtCurrency(c.amount_cents)}
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    )}
+
+    <!-- Payments table with filters -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+        <h2 class="font-semibold text-gray-800 mb-3">Payments</h2>
+        <!-- Filters -->
+        <form method="get" class="flex flex-wrap gap-3 items-end">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Building</label>
+            <select name="building" class="text-sm border border-gray-300 rounded px-2 py-1.5 bg-white">
+              <option value="">All buildings</option>
+              {buildings.map((b) => (
+                <option value={b.id} selected={filterBuilding === b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">From</label>
+            <input type="date" name="from" value={filterFrom} class="text-sm border border-gray-300 rounded px-2 py-1.5" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">To</label>
+            <input type="date" name="to" value={filterTo} class="text-sm border border-gray-300 rounded px-2 py-1.5" />
+          </div>
+          <div class="flex gap-2">
+            <button type="submit" class="bg-[var(--color-brand)] text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-[var(--color-brand-dark)]">
+              Filter
+            </button>
+            <a href="/admin/finance/income" class="border border-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm hover:border-gray-400">
+              Clear
+            </a>
+          </div>
+        </form>
+      </div>
+
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200">
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Date</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Tenant</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Building / Unit</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-700">Amount</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Method</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Receipt #</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filteredRows.length === 0 && (
+            <tr>
+              <td colspan="6" class="px-4 py-8 text-center text-gray-400">No payments match the selected filters.</td>
+            </tr>
+          )}
+          {filteredRows.map((row) => (
+            <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+              <td class="px-4 py-3 text-gray-600">{fmtDate(row.date)}</td>
+              <td class="px-4 py-3 font-medium">{row.tenant_name}</td>
+              <td class="px-4 py-3 text-gray-500 text-xs">{row.unit_label}</td>
+              <td class="px-4 py-3 text-right font-medium">{fmtCurrency(row.amount_cents)}</td>
+              <td class="px-4 py-3 text-gray-600">{row.method}</td>
+              <td class="px-4 py-3 text-gray-400 font-mono text-xs">{row.receipt_number}</td>
+            </tr>
+          ))}
+        </tbody>
+        {filteredRows.length > 0 && (
+          <tfoot>
+            <tr class="bg-gray-50">
+              <td class="px-4 py-3 font-semibold" colspan="3">
+                {filteredRows.length} payment{filteredRows.length !== 1 ? 's' : ''}
+              </td>
+              <td class="px-4 py-3 text-right font-bold">
+                {fmtCurrency(filteredRows.reduce((s, r) => s + r.amount_cents, 0))}
+              </td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
+    </div>
+  </div>
+</Base>
