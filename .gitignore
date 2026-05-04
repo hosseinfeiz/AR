@@ -1,0 +1,43 @@
+# deps
+node_modules/
+.pnpm-store/
+.turbo/
+
+# build outputs
+dist/
+build/
+.next/
+.expo/
+*.tsbuildinfo
+
+# env
+.env
+.env.local
+.env.*.local
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editors
+.vscode/
+.idea/
+
+# testing
+coverage/
+playwright-report/
+test-results/
+
+# secrets
+*.pem
+*.key
+service-account*.json
