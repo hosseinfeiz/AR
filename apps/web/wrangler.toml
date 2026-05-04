@@ -1,7 +1,24 @@
-# Cloudflare Pages — referenced by the @astrojs/cloudflare adapter.
-# This file lives at the project root (apps/web/) so wrangler can find it
-# when CF Pages runs the build with Root Directory = apps/web.
+# Cloudflare Workers config — referenced by the @astrojs/cloudflare adapter.
+#
+# Deploy target: Cloudflare Workers (not Pages).
+# CF Pages project settings expected:
+#   Root Directory: apps/web
+#   Build command:  pnpm install --frozen-lockfile && pnpm build
+#   Deploy command: npx wrangler deploy --config dist/server/wrangler.json
+#
+# The adapter merges this file with the build output and writes the final
+# config to dist/server/wrangler.json, which is what `wrangler deploy` reads.
+
 name = "ar-management-web"
 compatibility_date = "2026-04-01"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = "./dist"
+
+# Astro 6 enables sessions by default, and @astrojs/cloudflare binds them to a
+# KV namespace named SESSION. Create one (once per environment) and paste its
+# id below before deploying:
+#   npx wrangler kv namespace create SESSION
+#   npx wrangler kv namespace create SESSION --preview
+[[kv_namespaces]]
+binding = "SESSION"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
