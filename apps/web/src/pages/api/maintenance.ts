@@ -5,9 +5,9 @@
 // unset (dev / first-time deploy), the request is logged and a mock ref_id
 // is returned so the form still works end-to-end.
 
-import type { APIRoute } from 'astro'
 import { MaintenanceRequestInputSchema, generateRefId } from '@ar/shared'
 import { buildings as fixBuildings } from '../../lib/fixtures'
+import { apiHandler, badRequest, ok, respond } from '../../lib/api-handler'
 
 export const prerender = false
 
@@ -120,29 +120,10 @@ async function sendViaResend(args: {
   }
 }
 
-export const POST: APIRoute = async ({ request, locals }) => {
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400, headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  const parsed = MaintenanceRequestInputSchema.safeParse(body)
-  if (!parsed.success) {
-    return new Response(JSON.stringify({ error: 'Invalid request', issues: parsed.error.issues }), {
-      status: 400, headers: { 'Content-Type': 'application/json' },
-    })
-  }
-  const data = parsed.data
-
+export const POST = apiHandler(MaintenanceRequestInputSchema, async (data, { locals }) => {
   const building = fixBuildings.find((b) => b.id === data.building_id)
   if (!building || !building.contact_email) {
-    return new Response(JSON.stringify({ error: 'Unknown building' }), {
-      status: 400, headers: { 'Content-Type': 'application/json' },
-    })
+    return badRequest('Unknown building', 'UNKNOWN_BUILDING')
   }
 
   const refId = generateRefId()
@@ -162,9 +143,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     console.log('[maintenance] RESEND_API_KEY not set; logging request only', {
       refId, building: building.name, manager: building.contact_email, cc: OWNER_CC_EMAIL, subject,
     })
-    return new Response(JSON.stringify({ ref_id: refId, emailed: false }), {
-      status: 200, headers: { 'Content-Type': 'application/json' },
-    })
+    return ok({ ref_id: refId, emailed: false })
   }
 
   const result = await sendViaResend({
@@ -179,12 +158,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
   if (!result.ok) {
     // eslint-disable-next-line no-console
     console.error('[maintenance] email send failed', { refId, error: result.error })
-    return new Response(JSON.stringify({ error: 'Failed to deliver email', ref_id: refId }), {
-      status: 502, headers: { 'Content-Type': 'application/json' },
-    })
+    return respond(
+      { ok: false, error: 'Failed to deliver email', code: 'EMAIL_SEND_FAILED', ref_id: refId },
+      502,
+    )
   }
 
-  return new Response(JSON.stringify({ ref_id: refId, emailed: true }), {
-    status: 200, headers: { 'Content-Type': 'application/json' },
-  })
-}
+  return ok({ ref_id: refId, emailed: true })
+})

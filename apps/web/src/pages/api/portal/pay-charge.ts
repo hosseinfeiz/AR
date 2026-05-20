@@ -1,7 +1,12 @@
 export const prerender = false
-import type { APIRoute } from 'astro'
+import { z } from '@ar/shared'
 import { getSession } from '../../../lib/auth'
 import { charges, payments } from '../../../lib/tenant-fixtures'
+import { apiHandler, badRequest, notFound, ok, unauthorized } from '../../../lib/api-handler'
+
+const PayChargeInputSchema = z.object({
+  chargeId: z.string().min(1, 'chargeId required'),
+})
 
 function rcpNumber(): string {
   const a = String(Math.floor(Math.random() * 9000) + 1000)
@@ -9,46 +14,19 @@ function rcpNumber(): string {
   return `RCP-${a}-${b}`
 }
 
-export const POST: APIRoute = async ({ request, cookies }) => {
+export const POST = apiHandler(PayChargeInputSchema, (data, { cookies }) => {
   const session = getSession(cookies)
   if (!session || session.type !== 'tenant') {
-    return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'content-type': 'application/json' },
-    })
+    return unauthorized()
   }
 
-  let body: { chargeId?: string }
-  try {
-    body = await request.json()
-  } catch {
-    return new Response(JSON.stringify({ ok: false, error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'content-type': 'application/json' },
-    })
-  }
-
-  const { chargeId } = body
-  if (!chargeId) {
-    return new Response(JSON.stringify({ ok: false, error: 'chargeId required' }), {
-      status: 400,
-      headers: { 'content-type': 'application/json' },
-    })
-  }
-
-  const charge = charges.find((c) => c.id === chargeId)
+  const charge = charges.find((c) => c.id === data.chargeId)
   if (!charge || charge.tenant_id !== session.tenantId) {
-    return new Response(JSON.stringify({ ok: false, error: 'Charge not found' }), {
-      status: 404,
-      headers: { 'content-type': 'application/json' },
-    })
+    return notFound('Charge not found')
   }
 
   if (charge.status === 'paid') {
-    return new Response(JSON.stringify({ ok: false, error: 'Already paid' }), {
-      status: 400,
-      headers: { 'content-type': 'application/json' },
-    })
+    return badRequest('Already paid', 'ALREADY_PAID')
   }
 
   const receipt = rcpNumber()
@@ -58,7 +36,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   payments.push({
     id: paymentId,
     tenant_id: session.tenantId,
-    charge_id: chargeId,
+    charge_id: data.chargeId,
     amount_cents: charge.amount_cents,
     paid_at: new Date().toISOString(),
     method: 'card',
@@ -68,8 +46,5 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   charge.status = 'paid'
   charge.paid_payment_id = paymentId
 
-  return new Response(JSON.stringify({ ok: true, receipt_number: receipt }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  })
-}
+  return ok({ ok: true, receipt_number: receipt })
+})
