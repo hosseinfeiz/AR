@@ -158,9 +158,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
   if (!apiKey) {
     // Resend not yet configured — surface the request in logs and accept it.
-    // eslint-disable-next-line no-console
-    console.log('[maintenance] RESEND_API_KEY not set; logging request only', {
-      refId, building: building.name, manager: building.contact_email, cc: OWNER_CC_EMAIL, subject,
+    locals.log?.info('maintenance: RESEND_API_KEY not set; logging request only', {
+      ref_id: refId, building: building.name, manager: building.contact_email, cc: OWNER_CC_EMAIL, subject,
     })
     return new Response(JSON.stringify({ ref_id: refId, emailed: false }), {
       status: 200, headers: { 'Content-Type': 'application/json' },
@@ -177,8 +176,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   })
 
   if (!result.ok) {
-    // eslint-disable-next-line no-console
-    console.error('[maintenance] email send failed', { refId, error: result.error })
+    locals.log?.error('maintenance: email send failed', result.error, { ref_id: refId })
     return new Response(JSON.stringify({ error: 'Failed to deliver email', ref_id: refId }), {
       status: 502, headers: { 'Content-Type': 'application/json' },
     })

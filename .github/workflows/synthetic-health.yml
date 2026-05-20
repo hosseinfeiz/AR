@@ -1,0 +1,99 @@
+# Synthetic health probe — disabled by default.
+#
+# Hits the production /api/health endpoint every 5 minutes and opens a GitHub
+# issue if the check fails. This is the cheap fallback to a real uptime service
+# (see docs/superpowers/runbooks/synthetic-monitoring.md).
+#
+# TO ENABLE:
+#   1. Set the `HEALTH_URL` repo variable (Settings → Variables → Actions) to
+#      the production URL, e.g. https://ar-management.example/api/health
+#   2. Remove `if: false` from the `check` job below.
+#   3. Optionally set the `SLACK_WEBHOOK` secret for Slack notifications.
+
+name: synthetic-health
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  check:
+    if: false  # operator opt-in — see header comment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe /api/health
+        id: probe
+        env:
+          HEALTH_URL: ${{ vars.HEALTH_URL }}
+        run: |
+          set +e
+          if [ -z "$HEALTH_URL" ]; then
+            echo "::error::HEALTH_URL repo variable is not set"
+            exit 1
+          fi
+          response=$(mktemp)
+          headers=$(mktemp)
+          status=$(curl -sS -o "$response" -D "$headers" -w "%{http_code}" --max-time 15 "$HEALTH_URL")
+          curl_exit=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "curl_exit=$curl_exit" >> "$GITHUB_OUTPUT"
+          request_id=$(grep -i '^x-request-id:' "$headers" | awk '{print $2}' | tr -d '\r' || true)
+          echo "request_id=$request_id" >> "$GITHUB_OUTPUT"
+          body=$(cat "$response")
+          # GitHub Actions multi-line output
+          {
+            echo "body<<EOF"
+            echo "$body"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          # Determine pass/fail: non-200 OR body contains "degraded":true
+          failed=0
+          if [ "$curl_exit" -ne 0 ]; then failed=1; fi
+          if [ "$status" != "200" ]; then failed=1; fi
+          if echo "$body" | grep -q '"degraded":true'; then failed=1; fi
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          if [ "$failed" -eq 1 ]; then
+            echo "::warning::Health check failed (status=$status, exit=$curl_exit)"
+            exit 1
+          fi
+
+      - name: Open issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="synthetic-health: /api/health failed at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          body=$(cat <<EOF
+          Synthetic health probe failed.
+
+          - URL: ${{ vars.HEALTH_URL }}
+          - HTTP status: ${{ steps.probe.outputs.status }}
+          - curl exit: ${{ steps.probe.outputs.curl_exit }}
+          - request_id: ${{ steps.probe.outputs.request_id }}
+          - run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Response body:
+          \`\`\`json
+          ${{ steps.probe.outputs.body }}
+          \`\`\`
+          EOF
+          )
+          gh issue create \
+            --title "$title" \
+            --body "$body" \
+            --label "incident,synthetic-monitor" \
+            --repo "${{ github.repository }}"
+
+      - name: Notify Slack on failure
+        if: failure() && env.SLACK_WEBHOOK != ''
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            --data "{\"text\":\":rotating_light: synthetic-health failed for ${{ vars.HEALTH_URL }} — status ${{ steps.probe.outputs.status }} (request_id ${{ steps.probe.outputs.request_id }})\"}" \
+            "$SLACK_WEBHOOK"
