@@ -1,6 +1,6 @@
 ---
 interface Props {
-  active: 'overview' | 'payments' | 'maintenance' | 'messages'
+  active: 'overview' | 'payments' | 'maintenance' | 'messages' | 'lease-qa'
 }
 
 const { active } = Astro.props
@@ -10,6 +10,7 @@ const links = [
   { href: '/portal/payments', label: 'Payments', key: 'payments' },
   { href: '/portal/maintenance', label: 'Maintenance', key: 'maintenance' },
   { href: '/portal/messages', label: 'Messages', key: 'messages' },
+  { href: '/portal/lease-qa', label: 'Lease Q&A', key: 'lease-qa' },
 ]
 ---
 <nav class="border-b border-gray-200 bg-white sticky top-[53px] z-10">

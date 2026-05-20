@@ -11,7 +11,12 @@ function isActive(prefix: string): boolean {
 const mainTabs = [
   { href: '/admin', label: 'Dashboard', exact: true },
   { href: '/admin/tenants', label: 'Tenants' },
+  { href: '/admin/applicants', label: 'Applicants' },
   { href: '/admin/finance', label: 'Finance' },
+  { href: '/admin/maintenance', label: 'Maintenance' },
+  { href: '/admin/vendors', label: 'Vendors' },
+  { href: '/admin/showings/calendar', label: 'Showings' },
+  { href: '/admin/notifications/inbox', label: 'Notifications' },
   { href: '/admin/audit', label: 'Audit log' },
 ]
 
@@ -22,6 +27,18 @@ const financeTabs = [
   { href: '/admin/finance/expenses', label: 'Expenses' },
   { href: '/admin/finance/reports', label: 'Reports' },
   { href: '/admin/finance/tax', label: 'Tax / 1099' },
+]
+
+const isMaint = isActive('/admin/maintenance')
+const maintTabs = [
+  { href: '/admin/maintenance', label: 'Queue', exact: true },
+  { href: '/admin/maintenance/work-orders', label: 'Work orders' },
+]
+
+const isNotifications = isActive('/admin/notifications')
+const notificationsTabs = [
+  { href: '/admin/notifications/inbox', label: 'Inbox' },
+  { href: '/admin/notifications/preferences', label: 'Preferences' },
 ]
 ---
 <div class="border-b border-gray-200 bg-white print:hidden">
@@ -62,6 +79,42 @@ const financeTabs = [
                     : 'text-gray-500 hover:text-gray-800'
                 }`}
               >
+                {tab.label}
+              </a>
+            )
+          })}
+        </nav>
+      </div>
+    </div>
+  )}
+
+  <!-- Maintenance sub-tabs -->
+  {isMaint && (
+    <div class="bg-gray-50 border-t border-gray-200">
+      <div class="max-w-5xl mx-auto px-4">
+        <nav class="flex gap-4 py-2" aria-label="Maintenance sub-sections">
+          {maintTabs.map((tab) => {
+            const active = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href)
+            return (
+              <a href={tab.href} class={`text-xs font-medium px-2 py-1 rounded transition-colors ${active ? 'text-[var(--color-brand)] bg-blue-50' : 'text-gray-500 hover:text-gray-800'}`}>
+                {tab.label}
+              </a>
+            )
+          })}
+        </nav>
+      </div>
+    </div>
+  )}
+
+  <!-- Notifications sub-tabs -->
+  {isNotifications && (
+    <div class="bg-gray-50 border-t border-gray-200">
+      <div class="max-w-5xl mx-auto px-4">
+        <nav class="flex gap-4 py-2" aria-label="Notifications sub-sections">
+          {notificationsTabs.map((tab) => {
+            const active = pathname.startsWith(tab.href)
+            return (
+              <a href={tab.href} class={`text-xs font-medium px-2 py-1 rounded transition-colors ${active ? 'text-[var(--color-brand)] bg-blue-50' : 'text-gray-500 hover:text-gray-800'}`}>
                 {tab.label}
               </a>
             )
