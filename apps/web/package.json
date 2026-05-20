@@ -29,11 +29,14 @@
     "@sentry/astro": "^10.51.0",
     "@supabase/supabase-js": "^2.105.1",
     "@tailwindcss/vite": "^4.2.4",
+    "@vite-pwa/astro": "^1.2.0",
     "astro": "^6.2.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.75.0",
-    "tailwindcss": "^4.2.4"
+    "tailwindcss": "^4.2.4",
+    "web-push": "^3.6.7",
+    "workbox-window": "^7.4.1"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
@@ -41,6 +44,7 @@
     "@playwright/test": "^1.59.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.2.3",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9.39.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5",
