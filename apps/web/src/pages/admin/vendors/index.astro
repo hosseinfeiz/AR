@@ -1,0 +1,119 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import { listVendors, coiStatus, VENDOR_CATEGORY_LABELS, type Vendor } from '../../../lib/vendors'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/vendors')
+}
+
+const today = new Date('2026-05-20T00:00:00Z')
+const vendors = await listVendors({ active_only: false })
+
+const expiringSoon: Vendor[] = []
+const missingCoi: Vendor[] = []
+for (const v of vendors) {
+  const s = coiStatus(v, today)
+  if (s.state === 'expiring' || s.state === 'expired') expiringSoon.push(v)
+  if (s.state === 'missing') missingCoi.push(v)
+}
+
+const coiPill: Record<string, string> = {
+  ok:       'bg-green-100 text-green-800',
+  expiring: 'bg-amber-100 text-amber-800',
+  expired:  'bg-red-100 text-red-800',
+  missing:  'bg-gray-200 text-gray-700',
+}
+
+function fmtDate(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC',
+  })
+}
+---
+<Base title="Vendors — Admin — A & R Management">
+  <AdminNav />
+  <div class="max-w-5xl mx-auto px-4 py-10 space-y-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-500 mb-1"><a href="/admin" class="hover:underline">Admin</a> / Vendors</p>
+        <h1 class="text-3xl font-bold tracking-tight">Vendors</h1>
+        <p class="text-gray-500 mt-1">Directory of contractors used for maintenance work.</p>
+      </div>
+      <a
+        href="/admin/vendors/new"
+        class="inline-flex items-center bg-[var(--color-brand)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-brand-dark)] transition"
+      >+ Add vendor</a>
+    </div>
+
+    {(expiringSoon.length > 0 || missingCoi.length > 0) && (
+      <div class="border border-amber-200 bg-amber-50 rounded-xl p-5">
+        <h2 class="font-semibold text-amber-900 mb-2">Certificate of Insurance attention</h2>
+        <ul class="text-sm text-amber-900 space-y-1">
+          {expiringSoon.map((v) => {
+            const s = coiStatus(v, today)
+            return (
+              <li>
+                <a class="font-medium hover:underline" href={`/admin/vendors/${v.id}`}>{v.name}</a>
+                {' — '}
+                {s.state === 'expired'
+                  ? <span>COI expired {s.days_until_expiry != null ? `${Math.abs(s.days_until_expiry)} days ago` : ''}</span>
+                  : <span>COI expires in {s.days_until_expiry} day{s.days_until_expiry === 1 ? '' : 's'} (on {fmtDate(v.insurance_expiry_date)})</span>}
+              </li>
+            )
+          })}
+          {missingCoi.map((v) => (
+            <li><a class="font-medium hover:underline" href={`/admin/vendors/${v.id}`}>{v.name}</a> — no COI on file</li>
+          ))}
+        </ul>
+      </div>
+    )}
+
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200">
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Vendor</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Category</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Contact</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Rating</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">COI</th>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Active</th>
+          </tr>
+        </thead>
+        <tbody>
+          {vendors.map((v) => {
+            const s = coiStatus(v, today)
+            return (
+              <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+                <td class="px-4 py-3">
+                  <a class="font-medium text-[var(--color-brand)] hover:underline" href={`/admin/vendors/${v.id}`}>{v.name}</a>
+                  {v.license_number && <p class="text-xs text-gray-500 mt-0.5">Lic: {v.license_number}</p>}
+                </td>
+                <td class="px-4 py-3">{VENDOR_CATEGORY_LABELS[v.category]}</td>
+                <td class="px-4 py-3">
+                  <p>{v.contact_name ?? '—'}</p>
+                  <p class="text-xs text-gray-500">{v.phone ?? ''}</p>
+                </td>
+                <td class="px-4 py-3 text-gray-700">{v.rating != null ? `${v.rating.toFixed(1)} ★` : '—'}</td>
+                <td class="px-4 py-3">
+                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${coiPill[s.state] ?? ''}`}>
+                    {s.state === 'ok' ? `OK — ${s.days_until_expiry}d` : s.state}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-gray-700">{v.active ? 'Yes' : 'No'}</td>
+              </tr>
+            )
+          })}
+          {vendors.length === 0 && (
+            <tr><td colspan="6" class="px-4 py-10 text-center text-gray-500">No vendors on file.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Base>

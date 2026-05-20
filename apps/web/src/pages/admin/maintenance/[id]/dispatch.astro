@@ -1,0 +1,112 @@
+---
+export const prerender = false
+import Base from '../../../../layouts/Base.astro'
+import AdminNav from '../../../../components/AdminNav.astro'
+import { getSession } from '../../../../lib/auth'
+import { tenantRequests, tenants } from '../../../../lib/tenant-fixtures'
+import {
+  listVendors,
+  pickAutoDispatchVendor,
+  shouldAutoDispatch,
+  VENDOR_CATEGORY_LABELS,
+  coiStatus,
+  type VendorCategory,
+} from '../../../../lib/vendors'
+import { buildings } from '../../../../lib/fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/maintenance')
+}
+
+const id = Astro.params.id ?? ''
+const request = tenantRequests.find((r) => r.id === id)
+if (!request) return Astro.redirect('/admin/maintenance')
+
+const today = new Date('2026-05-20T00:00:00Z')
+const tenant = tenants.find((t) => t.id === request.tenant_id) ?? null
+const building = buildings.find((b) => b.id === request.building_id) ?? null
+
+// Suggest vendors matching the issue category, scoped to the building.
+const vendors = await listVendors({ active_only: true })
+const issueCat: VendorCategory | 'other' = (request.issue_type as VendorCategory | 'other')
+const recommended = pickAutoDispatchVendor(vendors, issueCat, request.building_id)
+const autoEligible = shouldAutoDispatch(request.urgency)
+---
+<Base title={`Dispatch ${request.ref_id} — Admin`}>
+  <AdminNav />
+  <div class="max-w-3xl mx-auto px-4 py-10 space-y-6">
+    <div>
+      <p class="text-sm text-gray-500 mb-1">
+        <a href="/admin" class="hover:underline">Admin</a> /
+        <a href="/admin/maintenance" class="hover:underline">Maintenance</a> /
+        Dispatch <span class="font-mono">{request.ref_id}</span>
+      </p>
+      <h1 class="text-3xl font-bold tracking-tight">Dispatch vendor</h1>
+    </div>
+
+    <div class="border border-gray-200 rounded-xl p-5 bg-gray-50">
+      <dl class="grid grid-cols-2 gap-y-1 gap-x-4 text-sm">
+        <dt class="text-gray-500">Tenant</dt><dd>{tenant?.name ?? '—'}</dd>
+        <dt class="text-gray-500">Building / Unit</dt><dd>{building?.name ?? '—'} / {request.unit_label}</dd>
+        <dt class="text-gray-500">Issue</dt><dd class="capitalize">{request.issue_type}</dd>
+        <dt class="text-gray-500">Urgency</dt><dd class="capitalize font-medium">{request.urgency}</dd>
+        <dt class="text-gray-500">Description</dt><dd>{request.description}</dd>
+      </dl>
+      {autoEligible && (
+        <p class="mt-3 text-xs text-amber-800 bg-amber-100 inline-block px-2 py-1 rounded">
+          Auto-dispatch eligible — {request.urgency} urgency
+        </p>
+      )}
+    </div>
+
+    {recommended && (
+      <div class="border border-blue-200 rounded-xl p-5 bg-blue-50">
+        <p class="text-xs text-blue-800 uppercase tracking-wide font-medium mb-2">Recommended</p>
+        <p class="font-semibold">{recommended.name}</p>
+        <p class="text-sm text-gray-700">
+          {VENDOR_CATEGORY_LABELS[recommended.category]} · {recommended.phone ?? '—'} · {recommended.rating != null ? `${recommended.rating.toFixed(1)} ★` : 'no rating'}
+        </p>
+      </div>
+    )}
+
+    <form
+      method="POST"
+      action={`/api/admin/maintenance/${request.id}/dispatch`}
+      class="border border-gray-200 rounded-xl p-6 space-y-4"
+      enctype="application/x-www-form-urlencoded"
+    >
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700">Vendor</span>
+        <select class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" name="vendor_id" required>
+          {vendors.map((v) => {
+            const s = coiStatus(v, today)
+            const warn = s.state === 'expired' || s.state === 'missing'
+            return (
+              <option value={v.id} selected={v.id === recommended?.id}>
+                {v.name} ({VENDOR_CATEGORY_LABELS[v.category]}){warn ? ' — COI ' + s.state : ''}
+              </option>
+            )
+          })}
+        </select>
+      </label>
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700">Initial status</span>
+        <select class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" name="status">
+          <option value="scheduled">Scheduled</option>
+          <option value="quoted">Quoted</option>
+          <option value="in_progress">In progress</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="text-sm font-medium text-gray-700">Notes (optional)</span>
+        <textarea class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows="3" name="notes"></textarea>
+      </label>
+
+      <div class="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
+        <a href="/admin/maintenance" class="text-sm text-gray-500 hover:text-gray-800">Cancel</a>
+        <button type="submit" class="bg-[var(--color-brand)] text-white text-sm px-4 py-2 rounded-lg font-medium hover:bg-[var(--color-brand-dark)] transition">Dispatch</button>
+      </div>
+    </form>
+  </div>
+</Base>
