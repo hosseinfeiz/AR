@@ -1,0 +1,200 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import { listApplicants, type ApplicantStatus, type Applicant } from '../../../lib/applicants'
+import { buildings } from '../../../lib/fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/applicants')
+}
+
+const all = await listApplicants()
+
+const COLUMNS: { status: ApplicantStatus; label: string; accent: string }[] = [
+  { status: 'inquiry',     label: 'Inquiry',      accent: 'bg-slate-100 text-slate-700 border-slate-200' },
+  { status: 'application', label: 'Application',  accent: 'bg-blue-50 text-blue-800 border-blue-200' },
+  { status: 'screening',   label: 'Screening',    accent: 'bg-amber-50 text-amber-800 border-amber-200' },
+  { status: 'lease_ready', label: 'Lease ready',  accent: 'bg-violet-50 text-violet-800 border-violet-200' },
+  { status: 'signed',      label: 'Signed',       accent: 'bg-green-50 text-green-800 border-green-200' },
+]
+
+function byStatus(s: ApplicantStatus): Applicant[] {
+  return all.filter((a) => a.status === s)
+}
+
+function buildingShort(id: string): string {
+  return buildings.find((b) => b.id === id)?.name.replace(' Apartments', '') ?? '—'
+}
+
+function fmtMoney(cents: number | null): string {
+  if (cents == null) return '—'
+  return (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—'
+  const d = iso.length === 10 ? new Date(iso + 'T00:00:00Z') : new Date(iso)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+}
+
+const withdrawn = byStatus('withdrawn')
+---
+<Base title="Applicants — Admin — A & R Management">
+  <AdminNav />
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <p class="text-sm text-gray-500 mb-1"><a href="/admin" class="hover:underline">Admin</a> / Applicants</p>
+        <h1 class="text-3xl font-bold tracking-tight">Applicant pipeline</h1>
+        <p class="text-gray-500 mt-1 text-sm">{all.length} active applicant{all.length === 1 ? '' : 's'} across all stages</p>
+      </div>
+      <button id="new-applicant-btn" class="bg-[var(--color-brand)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-brand-dark)] transition">
+        + New applicant
+      </button>
+    </div>
+
+    <!-- Kanban board -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      {COLUMNS.map((col) => {
+        const items = byStatus(col.status)
+        return (
+          <div class="bg-gray-50 rounded-xl border border-gray-200 flex flex-col min-h-[400px]">
+            <div class={`px-4 py-3 border-b flex items-center justify-between rounded-t-xl ${col.accent}`}>
+              <span class="font-semibold text-sm">{col.label}</span>
+              <span class="text-xs bg-white/70 rounded-full px-2 py-0.5">{items.length}</span>
+            </div>
+            <div class="p-3 flex flex-col gap-2 flex-1">
+              {items.length === 0 && (
+                <p class="text-xs text-gray-400 italic text-center py-8">No applicants</p>
+              )}
+              {items.map((a) => (
+                <a
+                  href={`/admin/applicants/${a.id}`}
+                  class="block bg-white rounded-lg border border-gray-200 px-3 py-2.5 shadow-sm hover:shadow-md hover:border-[var(--color-brand)] transition"
+                >
+                  <div class="font-medium text-sm text-gray-900 truncate">{a.name}</div>
+                  <div class="text-xs text-gray-500 mt-0.5 truncate">{a.email}</div>
+                  <div class="flex items-center justify-between mt-2 text-[11px] text-gray-600">
+                    <span>{buildingShort(a.building_id)}</span>
+                    <span>{fmtMoney(a.monthly_income_cents)}/mo</span>
+                  </div>
+                  <div class="text-[10px] text-gray-400 mt-1">Move-in {fmtDate(a.move_in_date)}</div>
+                  {a.screening_score != null && (
+                    <div class={`mt-1.5 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                      (a.screening_recommendation === 'accept' ? 'bg-green-100 text-green-800'
+                      : a.screening_recommendation === 'decline' ? 'bg-red-100 text-red-800'
+                      : 'bg-amber-100 text-amber-800')
+                    }`}>
+                      Score {a.screening_score}
+                    </div>
+                  )}
+                </a>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+
+    {withdrawn.length > 0 && (
+      <details class="mt-8">
+        <summary class="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
+          Withdrawn ({withdrawn.length})
+        </summary>
+        <ul class="mt-3 space-y-1 text-sm">
+          {withdrawn.map((a) => (
+            <li>
+              <a href={`/admin/applicants/${a.id}`} class="text-gray-500 hover:text-gray-800">
+                {a.name} <span class="text-gray-400">— {a.email}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </details>
+    )}
+  </div>
+
+  <!-- New applicant dialog -->
+  <dialog id="new-applicant-dialog" class="rounded-xl p-0 max-w-md w-full backdrop:bg-black/50">
+    <form method="dialog" id="new-applicant-form" class="p-6 space-y-4">
+      <h2 class="text-xl font-bold">New applicant</h2>
+      <div class="space-y-3">
+        <label class="block">
+          <span class="text-sm font-medium text-gray-700">Name</span>
+          <input name="name" required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium text-gray-700">Email</span>
+          <input name="email" type="email" required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium text-gray-700">Phone</span>
+          <input name="phone" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium text-gray-700">Building</span>
+          <select name="building_id" required class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            {buildings.map((b) => (
+              <option value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium text-gray-700">Move-in date</span>
+          <input name="move_in_date" type="date" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium text-gray-700">Monthly income (USD)</span>
+          <input name="monthly_income" type="number" step="100" min="0" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+      </div>
+      <p id="new-applicant-error" class="text-sm text-red-600 hidden"></p>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" id="new-applicant-cancel" class="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>
+        <button type="submit" class="px-4 py-2 text-sm rounded-lg bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-dark)]">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const dialog = document.getElementById('new-applicant-dialog') as HTMLDialogElement | null
+    const form = document.getElementById('new-applicant-form') as HTMLFormElement | null
+    const openBtn = document.getElementById('new-applicant-btn')
+    const cancelBtn = document.getElementById('new-applicant-cancel')
+    const errEl = document.getElementById('new-applicant-error') as HTMLParagraphElement | null
+
+    openBtn?.addEventListener('click', () => dialog?.showModal())
+    cancelBtn?.addEventListener('click', () => dialog?.close())
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      if (!form || !errEl) return
+      errEl.classList.add('hidden')
+      const fd = new FormData(form)
+      const monthlyIncome = fd.get('monthly_income')
+      const body = {
+        name: fd.get('name'),
+        email: fd.get('email'),
+        phone: fd.get('phone') || null,
+        building_id: fd.get('building_id'),
+        move_in_date: fd.get('move_in_date') || null,
+        monthly_income_cents: monthlyIncome ? Math.round(Number(monthlyIncome) * 100) : null,
+      }
+      const res = await fetch('/api/admin/applicants/create', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        errEl.textContent = (json as { error?: string }).error ?? 'Failed to create applicant'
+        errEl.classList.remove('hidden')
+        return
+      }
+      window.location.reload()
+    })
+  </script>
+</Base>
