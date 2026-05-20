@@ -1,0 +1,128 @@
+---
+export const prerender = false
+import Base from '../layouts/Base.astro'
+import { CompareDrawer, type CompareUnit } from '../components/islands/CompareDrawer'
+import { listAvailableUnits } from '../lib/data'
+
+// Server can't read localStorage, so we ship the full available-unit catalogue
+// keyed by id and let the page render only what's in the visitor's
+// `ar_favorites` set on the client.
+const units = await listAvailableUnits({})
+
+const unitsById: Record<string, CompareUnit> = {}
+for (const u of units) {
+  unitsById[u.id] = {
+    id: u.id,
+    unit_number: u.unit_number,
+    bedrooms: u.bedrooms,
+    bathrooms: u.bathrooms,
+    sqft: u.sqft,
+    monthly_rent_cents: u.monthly_rent_cents,
+    available_from: u.available_from,
+    building_name: u.building?.name,
+    building_slug: u.building?.slug,
+  }
+}
+const unitsByIdJson = JSON.stringify(unitsById)
+---
+<Base title="My favorites" description="Apartments you've saved for later.">
+  <section class="max-w-5xl mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold">My favorites</h1>
+    <p class="text-gray-600 mt-2">
+      Saved on this device only — favorites live in your browser's local storage.
+    </p>
+
+    <noscript>
+      <p class="mt-6 border border-yellow-300 bg-yellow-50 rounded-lg px-4 py-3 text-sm text-yellow-900">
+        Favorites require JavaScript. Enable JS to see units you've saved.
+      </p>
+    </noscript>
+
+    <!-- SSR placeholder: empty state shown until the client populates the list. -->
+    <div id="favorites-empty" class="mt-8 border border-dashed border-gray-300 rounded-xl p-8 text-center text-gray-600">
+      <p class="font-medium">No favorites yet</p>
+      <p class="text-sm mt-1">Tap the heart icon on any unit to save it here.</p>
+      <a href="/listings" class="inline-block mt-4 text-[var(--color-brand)] hover:underline">Browse available units →</a>
+    </div>
+
+    <div id="favorites-list" class="mt-8 hidden">
+      <div id="favorites-grid" class="grid sm:grid-cols-2 gap-4" />
+    </div>
+  </section>
+
+  <script is:inline type="application/json" id="favorites-data" set:html={unitsByIdJson} />
+
+  <CompareDrawer client:load unitsByIdJson={unitsByIdJson} />
+
+  <script is:inline>
+    (function () {
+      const dataEl = document.getElementById('favorites-data');
+      const emptyEl = document.getElementById('favorites-empty');
+      const listEl = document.getElementById('favorites-list');
+      const gridEl = document.getElementById('favorites-grid');
+      if (!dataEl || !emptyEl || !listEl || !gridEl) return;
+      let unitsById = {};
+      try { unitsById = JSON.parse(dataEl.textContent || '{}'); } catch { unitsById = {}; }
+
+      function readIds() {
+        try {
+          const raw = window.localStorage.getItem('ar_favorites') || '';
+          return raw.split(',').map(s => s.trim()).filter(Boolean);
+        } catch { return []; }
+      }
+
+      function rent(cents) { return '$' + (cents / 100).toLocaleString() + '/mo'; }
+      function beds(b) { return b === 0 ? 'Studio' : b + ' bd'; }
+
+      function render() {
+        const ids = readIds().filter(id => unitsById[id]);
+        if (ids.length === 0) {
+          emptyEl.classList.remove('hidden');
+          listEl.classList.add('hidden');
+          gridEl.innerHTML = '';
+          return;
+        }
+        emptyEl.classList.add('hidden');
+        listEl.classList.remove('hidden');
+        gridEl.innerHTML = ids.map(function (id) {
+          const u = unitsById[id];
+          const sqft = u.sqft ? ' · ' + u.sqft + ' sqft' : '';
+          const avail = u.available_from ? '<p class="text-xs text-gray-500 mt-2">Available ' + u.available_from + '</p>' : '';
+          const bld = u.building_name ? '<p class="text-sm text-gray-500">' + u.building_name + '</p>' : '';
+          return (
+            '<div class="relative border border-gray-200 rounded-xl p-5">' +
+              '<a href="/units/' + u.id + '" class="block pr-10">' +
+                '<div class="flex items-baseline justify-between gap-3">' +
+                  '<h3 class="text-lg font-semibold">Unit ' + u.unit_number + '</h3>' +
+                  '<span class="text-lg font-bold whitespace-nowrap">' + rent(u.monthly_rent_cents) + '</span>' +
+                '</div>' +
+                bld +
+                '<p class="text-sm text-gray-700 mt-2">' + beds(u.bedrooms) + ' · ' + u.bathrooms + ' ba' + sqft + '</p>' +
+                avail +
+              '</a>' +
+              '<button type="button" data-remove="' + u.id + '" class="absolute top-3 right-3 text-xs text-gray-500 hover:text-red-600 underline">Remove</button>' +
+            '</div>'
+          );
+        }).join('');
+        gridEl.querySelectorAll('[data-remove]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            const id = btn.getAttribute('data-remove');
+            const set = new Set(readIds());
+            set.delete(id);
+            try {
+              window.localStorage.setItem('ar_favorites', Array.from(set).join(','));
+              window.dispatchEvent(new CustomEvent('ar:favorites-changed', { detail: { kind: 'unit' } }));
+            } catch { /* ignore */ }
+            render();
+          });
+        });
+      }
+
+      render();
+      window.addEventListener('ar:favorites-changed', render);
+      window.addEventListener('storage', function (e) {
+        if (e.key === 'ar_favorites') render();
+      });
+    })();
+  </script>
+</Base>

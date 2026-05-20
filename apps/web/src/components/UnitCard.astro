@@ -1,4 +1,6 @@
 ---
+import { FavoritesButton } from './islands/FavoritesButton'
+
 interface Props {
   u: {
     id: string
@@ -10,17 +12,40 @@ interface Props {
     available_from: string | null
     building?: { name: string; slug: string }
   }
+  showFavorite?: boolean
 }
-const { u } = Astro.props
+const { u, showFavorite = true } = Astro.props
 const beds = u.bedrooms === 0 ? 'Studio' : `${u.bedrooms} bd`
 const rent = `$${(u.monthly_rent_cents / 100).toLocaleString()}`
+// Data attributes consumed by the CompareDrawer + tests; keep them stable.
+const dataAttrs = {
+  'data-unit-id': u.id,
+  'data-unit-number': u.unit_number,
+  'data-unit-rent-cents': String(u.monthly_rent_cents),
+  'data-unit-bedrooms': String(u.bedrooms),
+  'data-unit-bathrooms': String(u.bathrooms),
+  ...(u.sqft != null && { 'data-unit-sqft': String(u.sqft) }),
+  ...(u.available_from && { 'data-unit-available-from': u.available_from }),
+  ...(u.building?.slug && { 'data-unit-building-slug': u.building.slug }),
+  ...(u.building?.name && { 'data-unit-building-name': u.building.name }),
+}
 ---
-<a href={`/units/${u.id}`} class="block border border-gray-200 rounded-xl p-5 hover:border-[var(--color-brand)] transition">
-  <div class="flex items-baseline justify-between">
-    <h3 class="text-lg font-semibold">Unit {u.unit_number}</h3>
-    <span class="text-lg font-bold">{rent}<span class="text-sm font-normal text-gray-500">/mo</span></span>
-  </div>
-  {u.building && <p class="text-sm text-gray-500">{u.building.name}</p>}
-  <p class="text-sm text-gray-700 mt-2">{beds} · {u.bathrooms} ba{u.sqft ? ` · ${u.sqft} sqft` : ''}</p>
-  {u.available_from && <p class="text-xs text-gray-500 mt-2">Available {u.available_from}</p>}
-</a>
+<div class="relative" {...dataAttrs}>
+  <a
+    href={`/units/${u.id}`}
+    class="block border border-gray-200 rounded-xl p-5 pr-14 hover:border-[var(--color-brand)] transition"
+  >
+    <div class="flex items-baseline justify-between gap-3">
+      <h3 class="text-lg font-semibold">Unit {u.unit_number}</h3>
+      <span class="text-lg font-bold whitespace-nowrap">{rent}<span class="text-sm font-normal text-gray-500">/mo</span></span>
+    </div>
+    {u.building && <p class="text-sm text-gray-500">{u.building.name}</p>}
+    <p class="text-sm text-gray-700 mt-2">{beds} · {u.bathrooms} ba{u.sqft ? ` · ${u.sqft} sqft` : ''}</p>
+    {u.available_from && <p class="text-xs text-gray-500 mt-2">Available {u.available_from}</p>}
+  </a>
+  {showFavorite && (
+    <div class="absolute top-3 right-3">
+      <FavoritesButton client:load id={u.id} kind="unit" />
+    </div>
+  )}
+</div>

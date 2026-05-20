@@ -3,7 +3,9 @@ import Base from '../../layouts/Base.astro'
 import PhotoGallery from '../../components/PhotoGallery.astro'
 import UnitCard from '../../components/UnitCard.astro'
 import AmenityList from '../../components/AmenityList.astro'
+import BuildingHero from '../../components/BuildingHero.astro'
 import { getBuildingBySlug, listAvailableUnits } from '../../lib/data'
+import { buildApartmentComplexJsonLd, type JsonLdBuilding, type JsonLdUnit } from '../../lib/jsonld'
 
 const { slug } = Astro.params
 const building = await getBuildingBySlug(slug!)
@@ -12,23 +14,38 @@ if (!building) return Astro.redirect('/404')
 const units = await listAvailableUnits({ building_id: building.id })
 
 const photos = (building.building_photos ?? []).sort((a, b) => a.sort_order - b.sort_order)
+const heroPhoto = photos[0]
+
+const baseUrl = Astro.site?.toString().replace(/\/$/, '')
+const jsonLd = buildApartmentComplexJsonLd(
+  building as JsonLdBuilding,
+  units.map(
+    (u): JsonLdUnit => ({
+      id: u.id,
+      unit_number: u.unit_number,
+      bedrooms: u.bedrooms,
+      bathrooms: u.bathrooms,
+      sqft: u.sqft,
+      monthly_rent_cents: u.monthly_rent_cents,
+      available_from: u.available_from,
+    }),
+  ),
+  baseUrl,
+)
 ---
 <Base
   title={building.seo_title ?? `${building.name} — Apartments for Rent`}
   description={building.seo_description ?? building.description_md.slice(0, 160)}
+  jsonLd={jsonLd}
 >
   <section class="max-w-5xl mx-auto px-4 py-10">
     <h1 class="text-3xl sm:text-4xl font-bold">{building.name}</h1>
     <p class="text-gray-600 mt-1">{building.address_line1}, {building.city}, {building.state} {building.postal_code}</p>
   </section>
 
-  {photos.length > 0 && (
+  {heroPhoto && (
     <section class="max-w-5xl mx-auto px-4 pb-8">
-      <img
-        src={photos[0]!.storage_path}
-        alt={photos[0]!.alt_text}
-        class="w-full max-h-[480px] object-cover rounded-xl"
-      />
+      <BuildingHero storagePath={heroPhoto.storage_path} alt={heroPhoto.alt_text} />
       {photos.length > 1 && (
         <div class="mt-3">
           <PhotoGallery photos={photos.slice(1)} />

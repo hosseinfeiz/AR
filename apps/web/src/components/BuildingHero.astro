@@ -1,0 +1,53 @@
+---
+// Responsive page-top hero image with a `<picture>` srcset across the
+// standard widths (400 / 800 / 1200 / 1920). Distinct from `PhotoGallery`,
+// which is for in-page galleries.
+//
+// Falls back to a placeholder block when no photo is provided so the rest of
+// the page layout is unaffected.
+
+import { buildHeroSrcset } from '../lib/image-srcset'
+import { clientEnv } from '../lib/env'
+
+interface Props {
+  storagePath?: string | null
+  alt: string
+  priority?: boolean
+  rounded?: boolean
+  class?: string
+}
+
+const { storagePath, alt, priority = true, rounded = true, class: extraClass = '' } = Astro.props
+
+const hero = storagePath
+  ? buildHeroSrcset(clientEnv.VITE_SUPABASE_URL, storagePath, {
+      widths: [400, 800, 1200, 1920],
+      quality: 78,
+      format: 'webp',
+    })
+  : null
+const baseCls = `w-full max-h-[480px] object-cover ${rounded ? 'rounded-xl' : ''} ${extraClass}`.trim()
+---
+
+{hero ? (
+  <picture>
+    <img
+      src={hero.src}
+      srcset={hero.srcset}
+      sizes={hero.sizes}
+      alt={alt}
+      loading={priority ? 'eager' : 'lazy'}
+      decoding={priority ? 'sync' : 'async'}
+      fetchpriority={priority ? 'high' : 'auto'}
+      class={baseCls}
+    />
+  </picture>
+) : (
+  <div
+    class={`w-full h-64 bg-gray-100 flex items-center justify-center text-gray-400 ${rounded ? 'rounded-xl' : ''}`}
+    role="img"
+    aria-label={alt}
+  >
+    <span class="text-sm">No photo available</span>
+  </div>
+)}

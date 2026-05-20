@@ -2,11 +2,14 @@
 export const prerender = false
 import Base from '../layouts/Base.astro'
 import UnitCard from '../components/UnitCard.astro'
+import { CompareDrawer, type CompareUnit } from '../components/islands/CompareDrawer'
+import { UnitMap, type MapBuilding } from '../components/islands/UnitMap'
 import { listBuildings, listAvailableUnits } from '../lib/data'
 
 const buildingFilter = Astro.url.searchParams.get('building') ?? null
 const bedsFilter = Astro.url.searchParams.get('bedrooms')
 const maxRent = Astro.url.searchParams.get('max_rent')
+const view = Astro.url.searchParams.get('view') === 'map' ? 'map' : 'list'
 
 const units = await listAvailableUnits({
   building_slug: buildingFilter ?? undefined,
@@ -15,11 +18,80 @@ const units = await listAvailableUnits({
 })
 
 const buildings = await listBuildings()
+
+const mapboxToken = import.meta.env.PUBLIC_MAPBOX_TOKEN as string | undefined
+
+// Build the lookup the CompareDrawer needs (id → unit summary).
+const unitsById: Record<string, CompareUnit> = {}
+for (const u of units) {
+  unitsById[u.id] = {
+    id: u.id,
+    unit_number: u.unit_number,
+    bedrooms: u.bedrooms,
+    bathrooms: u.bathrooms,
+    sqft: u.sqft,
+    monthly_rent_cents: u.monthly_rent_cents,
+    available_from: u.available_from,
+    building_name: u.building?.name,
+    building_slug: u.building?.slug,
+  }
+}
+
+// Building coords for map view. Keep this in a single client-side blob so we
+// don't need a runtime fetch. Hard-coded for known fixtures; future data can
+// add `lat`/`lng` columns and we pick them up here.
+const COORDS: Record<string, { lng: number; lat: number }> = {
+  'grass-lake-manor': { lng: -93.2855, lat: 44.8688 },
+  'winnetka-manor': { lng: -93.3819, lat: 45.0349 },
+}
+const mapBuildings: MapBuilding[] = buildings
+  .filter((b) => COORDS[b.slug])
+  .map((b) => ({
+    id: b.id,
+    slug: b.slug,
+    name: b.name,
+    address: `${b.address_line1}, ${b.city}, ${b.state}`,
+    lng: COORDS[b.slug]!.lng,
+    lat: COORDS[b.slug]!.lat,
+    units: units
+      .filter((u) => u.building?.slug === b.slug || u.building_id === b.id)
+      .map((u) => ({
+        id: u.id,
+        unit_number: u.unit_number,
+        bedrooms: u.bedrooms,
+        monthly_rent_cents: u.monthly_rent_cents,
+      })),
+  }))
+  .filter((b) => b.units.length > 0)
+
+const baseParams = new URLSearchParams()
+if (buildingFilter) baseParams.set('building', buildingFilter)
+if (bedsFilter) baseParams.set('bedrooms', bedsFilter)
+if (maxRent) baseParams.set('max_rent', maxRent)
+const listHref = baseParams.toString() ? `/listings?${baseParams.toString()}` : '/listings'
+const mapParams = new URLSearchParams(baseParams)
+mapParams.set('view', 'map')
+const mapHref = `/listings?${mapParams.toString()}`
 ---
 <Base title="Available apartments" description="Browse all available apartments at Grass Lake Manor and Winnetka Manor.">
   <section class="max-w-5xl mx-auto px-4 py-10">
-    <h1 class="text-3xl font-bold">Available apartments</h1>
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <h1 class="text-3xl font-bold">Available apartments</h1>
+      <div class="inline-flex border border-gray-200 rounded-lg overflow-hidden text-sm">
+        <a
+          href={listHref}
+          class={`px-3 py-1.5 ${view === 'list' ? 'bg-[var(--color-brand)] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+          aria-current={view === 'list' ? 'page' : undefined}
+        >List view</a>
+        <a
+          href={mapHref}
+          class={`px-3 py-1.5 border-l border-gray-200 ${view === 'map' ? 'bg-[var(--color-brand)] text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+          aria-current={view === 'map' ? 'page' : undefined}
+        >Map view</a>
+      </div>
+    </div>
     <form method="get" class="flex flex-wrap gap-3 mt-4">
+      {view === 'map' && <input type="hidden" name="view" value="map" />}
       <select name="building" class="border rounded px-3 py-1.5">
         <option value="">All buildings</option>
         {buildings.map((b) => (
@@ -35,12 +107,22 @@ const buildings = await listBuildings()
       </select>
       <input type="number" name="max_rent" placeholder="Max rent ($)" value={maxRent ?? ''} class="border rounded px-3 py-1.5 w-32" />
       <button type="submit" class="bg-[var(--color-brand)] text-white px-3 py-1.5 rounded">Filter</button>
-      <a href="/listings" class="text-sm text-gray-500 self-center">Clear</a>
+      <a href={view === 'map' ? '/listings?view=map' : '/listings'} class="text-sm text-gray-500 self-center">Clear</a>
+      <a href="/favorites" class="text-sm text-[var(--color-brand)] self-center ml-auto">My favorites →</a>
     </form>
   </section>
-  <section class="max-w-5xl mx-auto px-4 pb-12">
-    {units.length === 0 ? <p class="text-gray-600">No units match your filters.</p> : (
-      <div class="grid sm:grid-cols-2 gap-4">{units.map((u) => <UnitCard u={u} />)}</div>
-    )}
-  </section>
+
+  {view === 'map' ? (
+    <section class="max-w-5xl mx-auto px-4 pb-12">
+      <UnitMap client:only="react" buildingsJson={JSON.stringify(mapBuildings)} token={mapboxToken} />
+    </section>
+  ) : (
+    <section class="max-w-5xl mx-auto px-4 pb-12">
+      {units.length === 0 ? <p class="text-gray-600">No units match your filters.</p> : (
+        <div class="grid sm:grid-cols-2 gap-4">{units.map((u) => <UnitCard u={u} />)}</div>
+      )}
+    </section>
+  )}
+
+  <CompareDrawer client:load unitsByIdJson={JSON.stringify(unitsById)} />
 </Base>
