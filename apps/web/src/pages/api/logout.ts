@@ -1,11 +1,8 @@
 export const prerender = false
-import type { APIRoute } from 'astro'
 import { clearSession } from '../../lib/auth'
+import { apiHandler, ok } from '../../lib/api-handler'
 
-export const POST: APIRoute = async ({ cookies }) => {
+export const POST = apiHandler(null, (_data, { cookies }) => {
   clearSession(cookies)
-  return new Response(JSON.stringify({ ok: true, redirect: '/' }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  })
-}
+  return ok({ ok: true, redirect: '/' })
+})

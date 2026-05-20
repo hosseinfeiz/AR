@@ -1,40 +1,28 @@
 export const prerender = false
-import type { APIRoute } from 'astro'
+import { z } from '@ar/shared'
 import { checkAdminCreds, checkTenantPassword, setSessionAdmin, setSessionTenant } from '../../lib/auth'
 import { findTenantByEmail } from '../../lib/tenant-fixtures'
+import { apiHandler, ok, respond } from '../../lib/api-handler'
 
-export const POST: APIRoute = async ({ request, cookies }) => {
-  let body: { username?: string; password?: string; redirect?: string }
-  try {
-    body = await request.json()
-  } catch {
-    return new Response(JSON.stringify({ ok: false, error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'content-type': 'application/json' },
-    })
-  }
+const LoginInputSchema = z.object({
+  username: z.string().default(''),
+  password: z.string().default(''),
+  redirect: z.string().optional(),
+})
 
-  const { username = '', password = '', redirect } = body
+export const POST = apiHandler(LoginInputSchema, async (data, { cookies }) => {
+  const { username, password, redirect } = data
 
   if (await checkAdminCreds(username, password)) {
     setSessionAdmin(cookies)
-    return new Response(JSON.stringify({ ok: true, redirect: redirect ?? '/admin' }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })
+    return ok({ ok: true, redirect: redirect ?? '/admin' })
   }
 
   const tenant = findTenantByEmail(username)
   if (tenant && (await checkTenantPassword(tenant.password_sha256, password))) {
     setSessionTenant(cookies, tenant.id)
-    return new Response(JSON.stringify({ ok: true, redirect: redirect ?? '/portal' }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })
+    return ok({ ok: true, redirect: redirect ?? '/portal' })
   }
 
-  return new Response(JSON.stringify({ ok: false, error: 'Invalid credentials' }), {
-    status: 401,
-    headers: { 'content-type': 'application/json' },
-  })
-}
+  return respond({ ok: false, error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' }, 401)
+})

@@ -1,47 +1,25 @@
 export const prerender = false
-import type { APIRoute } from 'astro'
+import { z } from '@ar/shared'
 import { getSession } from '../../../lib/auth'
 import { messages } from '../../../lib/tenant-fixtures'
+import { apiHandler, notFound, ok, unauthorized } from '../../../lib/api-handler'
 
-export const POST: APIRoute = async ({ request, cookies }) => {
+const MarkReadInputSchema = z.object({
+  messageId: z.string().min(1, 'messageId required'),
+})
+
+export const POST = apiHandler(MarkReadInputSchema, (data, { cookies }) => {
   const session = getSession(cookies)
   if (!session || session.type !== 'tenant') {
-    return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'content-type': 'application/json' },
-    })
+    return unauthorized()
   }
 
-  let body: { messageId?: string }
-  try {
-    body = await request.json()
-  } catch {
-    return new Response(JSON.stringify({ ok: false, error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { 'content-type': 'application/json' },
-    })
-  }
-
-  const { messageId } = body
-  if (!messageId) {
-    return new Response(JSON.stringify({ ok: false, error: 'messageId required' }), {
-      status: 400,
-      headers: { 'content-type': 'application/json' },
-    })
-  }
-
-  const message = messages.find((m) => m.id === messageId)
+  const message = messages.find((m) => m.id === data.messageId)
   if (!message || message.tenant_id !== session.tenantId) {
-    return new Response(JSON.stringify({ ok: false, error: 'Message not found' }), {
-      status: 404,
-      headers: { 'content-type': 'application/json' },
-    })
+    return notFound('Message not found')
   }
 
   message.read = true
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  })
-}
+  return ok({ ok: true })
+})
