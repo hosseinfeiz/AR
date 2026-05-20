@@ -13,6 +13,10 @@ name = "ar-management-web"
 compatibility_date = "2026-04-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Edge cache headers for static assets and personalized routes live in
+# `public/_headers` (Cloudflare Pages / Workers Assets format). Keep that file
+# in sync with `vercel.json`'s `headers` block when changing cache policy.
+
 # Astro 6 enables sessions by default, and @astrojs/cloudflare binds them to a
 # KV namespace named SESSION. Create one (once per environment) and paste its
 # id below before deploying:

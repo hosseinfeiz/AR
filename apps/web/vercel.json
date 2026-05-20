@@ -3,5 +3,49 @@
   "buildCommand": "cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @ar/web build",
   "installCommand": "echo skip-install handled-by-buildCommand",
   "outputDirectory": ".vercel/output",
-  "framework": "astro"
+  "framework": "astro",
+  "headers": [
+    {
+      "source": "/public/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/buildings/(.*)\\.(png|jpg|jpeg|webp|avif|svg)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/favicon.ico",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/api/login",
+      "headers": [
+        { "key": "Cache-Control", "value": "private, no-cache" }
+      ]
+    },
+    {
+      "source": "/api/logout",
+      "headers": [
+        { "key": "Cache-Control", "value": "private, no-cache" }
+      ]
+    },
+    {
+      "source": "/portal/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "private, no-cache" }
+      ]
+    },
+    {
+      "source": "/admin/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "private, no-cache" }
+      ]
+    }
+  ]
 }
