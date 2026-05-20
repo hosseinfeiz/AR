@@ -1,6 +1,7 @@
 ---
 import { getSession } from '../lib/auth'
 import { LogoutButton } from './islands/LogoutButton'
+import ThemeToggle from './ThemeToggle.astro'
 
 const session = getSession(Astro.cookies)
 
@@ -20,6 +21,7 @@ const links = [
       ))}
     </ul>
     <div class="hidden sm:flex items-center gap-3">
+      <ThemeToggle />
       {session === null && (
         <>
           <a href="/login" class="text-sm text-gray-600 hover:text-gray-900">Sign in</a>

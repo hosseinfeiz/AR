@@ -1,0 +1,97 @@
+---
+/**
+ * ThemeToggle — small button that toggles `data-theme` on <html>.
+ *
+ * Persists the user's choice in localStorage under `ar_theme`. The initial
+ * resolution runs as an inline script *before* the body renders so we avoid
+ * a flash of the wrong theme (FOUC). When no explicit choice exists, the
+ * design tokens already fall back to `prefers-color-scheme`.
+ */
+---
+<button
+  id="theme-toggle"
+  type="button"
+  class="theme-toggle"
+  aria-label="Toggle dark mode"
+  aria-live="polite"
+>
+  <span class="theme-toggle__icon" data-theme-icon="light" aria-hidden="true">☀</span>
+  <span class="theme-toggle__icon" data-theme-icon="dark" aria-hidden="true">☾</span>
+  <span class="sr-only" data-theme-label>Toggle theme</span>
+</button>
+
+<style>
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius-md, 0.5rem);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease;
+  }
+  .theme-toggle:hover {
+    background: var(--color-surface-muted);
+    border-color: var(--color-border-strong);
+  }
+  .theme-toggle__icon { font-size: 1rem; line-height: 1; }
+  /* Show only the icon for the currently active theme. */
+  html:not([data-theme="dark"]) .theme-toggle [data-theme-icon="dark"] { display: none; }
+  html[data-theme="dark"] .theme-toggle [data-theme-icon="light"] { display: none; }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>
+
+<script is:inline>
+  // Apply persisted theme as early as possible to avoid FOUC.
+  (function applyInitialTheme() {
+    try {
+      var stored = localStorage.getItem('ar_theme');
+      if (stored === 'dark' || stored === 'light') {
+        document.documentElement.setAttribute('data-theme', stored);
+      }
+    } catch (_err) {
+      /* localStorage may throw in privacy modes — fall back to OS preference. */
+    }
+  })();
+</script>
+
+<script>
+  // Hook up the click handler once the DOM is ready.
+  function resolveActiveTheme(): 'dark' | 'light' {
+    const explicit = document.documentElement.getAttribute('data-theme')
+    if (explicit === 'dark' || explicit === 'light') return explicit
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  }
+
+  function wire() {
+    const btn = document.getElementById('theme-toggle')
+    if (!btn) return
+    btn.addEventListener('click', () => {
+      const next = resolveActiveTheme() === 'dark' ? 'light' : 'dark'
+      document.documentElement.setAttribute('data-theme', next)
+      try { localStorage.setItem('ar_theme', next) } catch (_err) { /* ignore */ }
+      btn.setAttribute('aria-label', next === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')
+    })
+    btn.setAttribute('aria-label', resolveActiveTheme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire)
+  } else {
+    wire()
+  }
+</script>

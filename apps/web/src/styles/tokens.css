@@ -1,21 +1,24 @@
 /**
- * Design tokens (F3).
+ * Design tokens (F3 base + S8 dark-mode toggles).
  *
  * Single source of truth for colors, spacing, typography, radii, and shadows.
  * Tokens are exposed as CSS custom properties so they work with Tailwind v4
  * arbitrary values (e.g. `bg-[var(--color-brand)]`) and with hand-written CSS.
  *
- * Semantic tokens (--color-bg, --color-surface, --color-text, ...) re-bind in
- * the dark-mode block below. The actual UI does NOT yet flip in dark mode —
- * components still use Tailwind utilities with literal colors. The dark
- * variables are defined here so a future ticket (S8) can swap utilities for
- * tokens incrementally.
+ * Dark mode flips the *semantic* tokens (--color-bg, --color-surface, --color-text, ...)
+ * via three triggers:
+ *   1. @media (prefers-color-scheme: dark)  — OS preference
+ *   2. [data-theme="dark"]                  — manual toggle on <html>
+ *   3. [data-theme="light"]                 — force light even when OS prefers dark
+ *
+ * Components should consume var(--color-*) — never hard-coded hex values.
  */
 
 :root {
   /* Brand */
   --color-brand: #0a58ca;
   --color-brand-dark: #0747a6;
+  --color-brand-contrast: #ffffff;
 
   /* Neutral gray scale */
   --color-gray-50: #f9fafb;
@@ -29,33 +32,40 @@
   --color-gray-800: #1f2937;
   --color-gray-900: #111827;
 
-  /* Semantic surfaces */
+  /* Semantic surfaces (light defaults) */
   --color-bg: #ffffff;
   --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-surface-raised: #ffffff;
   --color-text: #111827;
-  --color-text-muted: #6b7280;
+  --color-text-muted: #4b5563;
+  --color-text-subtle: #6b7280;
   --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-overlay: rgba(15, 23, 42, 0.72);
+  --color-focus-ring: #2563eb;
 
   /* Status */
-  --color-success: #16a34a;
-  --color-warning: #d97706;
-  --color-error: #dc2626;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-error: #b91c1c;
+  --color-danger: var(--color-error); /* alias */
   --color-info: #0a58ca;
 
   /* Spacing — 4px scale */
   --space-0: 0;
-  --space-1: 0.25rem;  /*  4px */
-  --space-2: 0.5rem;   /*  8px */
-  --space-3: 0.75rem;  /* 12px */
-  --space-4: 1rem;     /* 16px */
-  --space-5: 1.25rem;  /* 20px */
-  --space-6: 1.5rem;   /* 24px */
-  --space-7: 1.75rem;  /* 28px */
-  --space-8: 2rem;     /* 32px */
-  --space-9: 2.25rem;  /* 36px */
-  --space-10: 2.5rem;  /* 40px */
-  --space-11: 2.75rem; /* 44px */
-  --space-12: 3rem;    /* 48px */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 1.75rem;
+  --space-8: 2rem;
+  --space-9: 2.25rem;
+  --space-10: 2.5rem;
+  --space-11: 2.75rem;
+  --space-12: 3rem;
 
   /* Typography — size + paired line-height */
   --text-xs: 0.75rem;     --leading-xs: 1rem;
@@ -80,27 +90,55 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
-/**
- * Dark mode token values.
- *
- * NOTE: these only re-bind the *semantic* tokens. We deliberately leave the
- * brand color the same and do NOT flip raw gray-scale tokens. Components
- * that still hard-code `bg-white` / `text-gray-900` via Tailwind utilities
- * will not actually flip until they are migrated to semantic tokens — that
- * is a separate ticket (S8). The variables are defined now so the migration
- * can land incrementally.
- */
+/* OS-level dark preference (when no explicit data-theme is set) */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #0b0f17;
+    --color-bg: #0b1220;
     --color-surface: #111827;
+    --color-surface-muted: #0f172a;
+    --color-surface-raised: #1f2937;
     --color-text: #f3f4f6;
-    --color-text-muted: #9ca3af;
+    --color-text-muted: #cbd5e1;
+    --color-text-subtle: #9ca3af;
     --color-border: #1f2937;
-
-    --color-success: #22c55e;
-    --color-warning: #f59e0b;
-    --color-error: #ef4444;
-    --color-info: #60a5fa;
+    --color-border-strong: #374151;
+    --color-overlay: rgba(0, 0, 0, 0.8);
+    --color-focus-ring: #60a5fa;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
   }
+}
+
+/* Manual dark override — mirrors the prefers-color-scheme block above */
+[data-theme="dark"] {
+  --color-bg: #0b1220;
+  --color-surface: #111827;
+  --color-surface-muted: #0f172a;
+  --color-surface-raised: #1f2937;
+  --color-text: #f3f4f6;
+  --color-text-muted: #cbd5e1;
+  --color-text-subtle: #9ca3af;
+  --color-border: #1f2937;
+  --color-border-strong: #374151;
+  --color-overlay: rgba(0, 0, 0, 0.8);
+  --color-focus-ring: #60a5fa;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
+}
+
+/* Manual light override — forces light values even when OS prefers dark */
+[data-theme="light"] {
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-surface-raised: #ffffff;
+  --color-text: #111827;
+  --color-text-muted: #4b5563;
+  --color-text-subtle: #6b7280;
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-overlay: rgba(15, 23, 42, 0.72);
+  --color-focus-ring: #2563eb;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
 }

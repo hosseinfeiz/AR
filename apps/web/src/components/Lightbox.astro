@@ -1,0 +1,17 @@
+---
+/**
+ * Lightbox — thin Astro wrapper around the React `LightboxModal` island.
+ *
+ * Usage: place after a gallery and pass the gallery's container id via
+ * `sourceId`. The island will scan that container for
+ * `<img data-lightbox-src>` elements and wire up click/keyboard handlers.
+ */
+import { LightboxModal } from './islands/LightboxModal'
+
+interface Props {
+  sourceId: string
+}
+
+const { sourceId } = Astro.props
+---
+<LightboxModal client:load sourceId={sourceId} />
