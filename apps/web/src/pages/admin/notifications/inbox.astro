@@ -1,0 +1,165 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import { inAppListForRecipient, type NotificationRow } from '../../../lib/notifications'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/notifications/inbox')
+}
+
+const FALLBACK_MANAGER_EMAIL = 'admin@ar-management.example'
+const headerEmail = Astro.request.headers.get('x-manager-email') ?? ''
+const managerEmail =
+  headerEmail && headerEmail.includes('@') ? headerEmail : FALLBACK_MANAGER_EMAIL
+
+const url = new URL(Astro.request.url)
+const unreadOnly = url.searchParams.get('unread') === '1'
+
+let rows: NotificationRow[] = []
+try {
+  rows = await inAppListForRecipient({
+    recipient_email: managerEmail,
+    unread_only: unreadOnly,
+    limit: 100,
+  })
+} catch (e) {
+  console.warn('[admin/notifications/inbox] list failed', e)
+}
+
+const unreadCount = rows.filter((r) => !r.read_at).length
+
+function fmtTime(s: string): string {
+  try {
+    return new Date(s).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  } catch {
+    return s
+  }
+}
+
+function summary(r: NotificationRow): string {
+  const p = (r.payload ?? {}) as Record<string, unknown>
+  if (typeof p.summary === 'string') return p.summary
+  if (typeof p.title === 'string') return p.title
+  if (typeof p.ref_id === 'string') return `#${p.ref_id}`
+  return r.kind
+}
+
+function title(r: NotificationRow): string {
+  const p = (r.payload ?? {}) as Record<string, unknown>
+  if (typeof p.title === 'string') return p.title
+  switch (r.kind) {
+    case 'maintenance_request': return 'New maintenance request'
+    case 'showing_request': return 'New showing request'
+    case 'digest': return 'Digest'
+    case 'system': return 'System notification'
+  }
+}
+
+function kindPill(k: string): string {
+  switch (k) {
+    case 'maintenance_request': return 'bg-red-100 text-red-800'
+    case 'showing_request': return 'bg-blue-100 text-blue-800'
+    case 'digest': return 'bg-gray-100 text-gray-800'
+    default: return 'bg-amber-100 text-amber-800'
+  }
+}
+---
+<Base title="Notifications inbox — Admin — A & R Management">
+  <AdminNav />
+  <div class="max-w-3xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <p class="text-sm text-gray-500 mb-1">
+          <a href="/admin" class="hover:underline">Admin</a> / Notifications
+        </p>
+        <h1 class="text-2xl font-bold tracking-tight">Notifications</h1>
+        <p class="text-sm text-gray-500 mt-1">
+          {unreadCount} unread · <a href="/admin/notifications/preferences" class="hover:underline">Preferences</a>
+        </p>
+      </div>
+      <div class="flex gap-2">
+        <a href="/admin/notifications/inbox"
+          class={`text-xs px-3 py-1.5 rounded-lg border ${!unreadOnly ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-600 hover:border-gray-400'}`}>
+          All
+        </a>
+        <a href="/admin/notifications/inbox?unread=1"
+          class={`text-xs px-3 py-1.5 rounded-lg border ${unreadOnly ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-600 hover:border-gray-400'}`}>
+          Unread only
+        </a>
+      </div>
+    </div>
+
+    {rows.length === 0 && (
+      <div class="border border-dashed border-gray-300 rounded-xl p-10 text-center text-gray-500">
+        Nothing here yet.
+      </div>
+    )}
+
+    <ul class="space-y-2" id="inbox-list">
+      {rows.map((r) => (
+        <li
+          data-id={r.id}
+          class={`border rounded-xl p-4 flex items-start justify-between gap-4 ${r.read_at ? 'border-gray-200 bg-white' : 'border-amber-200 bg-amber-50'}`}
+        >
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <span class={`text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded ${kindPill(r.kind)}`}>
+                {r.kind.replace('_', ' ')}
+              </span>
+              <span class="text-xs text-gray-500">{fmtTime(r.created_at)}</span>
+              {!r.sent_at && <span class="text-[10px] uppercase text-amber-700">queued</span>}
+            </div>
+            <p class="font-medium text-sm">{title(r)}</p>
+            <p class="text-sm text-gray-600 mt-1">{summary(r)}</p>
+          </div>
+          {!r.read_at && (
+            <button
+              type="button"
+              data-action="mark-read"
+              class="text-xs border border-gray-300 text-gray-700 px-2.5 py-1 rounded-lg hover:border-gray-400 transition"
+            >
+              Mark read
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  </div>
+
+  <script>
+    const list = document.getElementById('inbox-list')
+    if (list) {
+      list.addEventListener('click', async (ev) => {
+        const target = ev.target as HTMLElement | null
+        if (!target || target.dataset.action !== 'mark-read') return
+        const li = target.closest('li') as HTMLLIElement | null
+        const id = li?.dataset.id
+        if (!id) return
+        target.setAttribute('disabled', 'true')
+        try {
+          const r = await fetch('/api/admin/notifications/mark-read', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ id }),
+          })
+          const j = (await r.json()) as { ok?: boolean }
+          if (j.ok && li) {
+            li.classList.remove('border-amber-200', 'bg-amber-50')
+            li.classList.add('border-gray-200', 'bg-white')
+            target.remove()
+          }
+        } catch {
+          target.removeAttribute('disabled')
+        }
+      })
+    }
+  </script>
+</Base>
