@@ -1,15 +1,17 @@
 ---
 import { transformedPhotoUrl } from '../lib/photo-url'
 import { clientEnv } from '../lib/env'
+import Lightbox from './Lightbox.astro'
+
 interface Photo { storage_path: string; alt_text: string }
 interface Props { photos: Photo[]; columns?: 1 | 2 | 3 }
 const { photos, columns = 3 } = Astro.props
 
-function resolveSrc(path: string): string {
+function resolveSrc(path: string, width = 1200): string {
   // Local public asset (starts with `/`) or absolute URL — use as-is.
   if (path.startsWith('/') || path.startsWith('http')) return path
   // Otherwise treat as a Supabase storage object and use the transform endpoint.
-  return transformedPhotoUrl(clientEnv.VITE_SUPABASE_URL, path, { width: 1200, quality: 80, format: 'webp' })
+  return transformedPhotoUrl(clientEnv.VITE_SUPABASE_URL, path, { width, quality: 80, format: 'webp' })
 }
 
 const gridCls =
@@ -18,16 +20,23 @@ const gridCls =
     : columns === 2
       ? 'grid grid-cols-1 sm:grid-cols-2 gap-2'
       : 'grid grid-cols-2 sm:grid-cols-3 gap-2'
+
+// Unique container id so multiple galleries on one page each get their own lightbox.
+const galleryId = `photo-gallery-${Math.random().toString(36).slice(2, 9)}`
 ---
 {photos.length === 0 ? null : (
-  <div class={gridCls}>
-    {photos.map((p) => (
-      <img
-        src={resolveSrc(p.storage_path)}
-        alt={p.alt_text}
-        loading="lazy"
-        class="rounded-lg object-cover w-full aspect-[4/3]"
-      />
-    ))}
-  </div>
+  <>
+    <div id={galleryId} class={gridCls}>
+      {photos.map((p) => (
+        <img
+          src={resolveSrc(p.storage_path, 800)}
+          data-lightbox-src={resolveSrc(p.storage_path, 1600)}
+          alt={p.alt_text}
+          loading="lazy"
+          class="rounded-lg object-cover w-full aspect-[4/3]"
+        />
+      ))}
+    </div>
+    <Lightbox sourceId={galleryId} />
+  </>
 )}

@@ -1,0 +1,93 @@
+/* Design tokens — single source of truth for color, surface and text.
+ * The light defaults live on :root. The dark variants are exposed three ways:
+ *   1. prefers-color-scheme: dark   (OS preference)
+ *   2. [data-theme="dark"]          (explicit manual override on <html>)
+ * And a light override:
+ *   3. [data-theme="light"]         (forces light even when the OS prefers dark)
+ * Components should consume var(--color-*) — never hard-coded hex values.
+ */
+
+:root {
+  /* Brand palette — shared across themes */
+  --color-brand: #0a58ca;
+  --color-brand-dark: #0747a6;
+  --color-brand-contrast: #ffffff;
+
+  /* Light theme — defaults */
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-surface-raised: #ffffff;
+  --color-text: #111827;
+  --color-text-muted: #4b5563;
+  --color-text-subtle: #6b7280;
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-overlay: rgba(15, 23, 42, 0.72);
+  --color-focus-ring: #2563eb;
+
+  /* Semantic feedback */
+  --color-success: #15803d;
+  --color-danger: #b91c1c;
+  --color-warning: #b45309;
+
+  /* Radii & shadows */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* OS-level dark preference (no explicit toggle set) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0b1220;
+    --color-surface: #111827;
+    --color-surface-muted: #0f172a;
+    --color-surface-raised: #1f2937;
+    --color-text: #f3f4f6;
+    --color-text-muted: #cbd5e1;
+    --color-text-subtle: #9ca3af;
+    --color-border: #1f2937;
+    --color-border-strong: #374151;
+    --color-overlay: rgba(0, 0, 0, 0.8);
+    --color-focus-ring: #60a5fa;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* Manual dark override — must mirror the prefers-color-scheme block above */
+[data-theme="dark"] {
+  --color-bg: #0b1220;
+  --color-surface: #111827;
+  --color-surface-muted: #0f172a;
+  --color-surface-raised: #1f2937;
+  --color-text: #f3f4f6;
+  --color-text-muted: #cbd5e1;
+  --color-text-subtle: #9ca3af;
+  --color-border: #1f2937;
+  --color-border-strong: #374151;
+  --color-overlay: rgba(0, 0, 0, 0.8);
+  --color-focus-ring: #60a5fa;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
+}
+
+/* Manual light override — forces light values even when the OS prefers dark */
+[data-theme="light"] {
+  --color-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-surface-raised: #ffffff;
+  --color-text: #111827;
+  --color-text-muted: #4b5563;
+  --color-text-subtle: #6b7280;
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-overlay: rgba(15, 23, 42, 0.72);
+  --color-focus-ring: #2563eb;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
