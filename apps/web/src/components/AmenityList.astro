@@ -1,11 +1,12 @@
 ---
+import Badge from './primitives/Badge.astro'
 interface Props { amenities: string[] }
 const { amenities } = Astro.props
 ---
 {amenities.length === 0 ? null : (
   <ul class="flex flex-wrap gap-2">
     {amenities.map((a) => (
-      <li class="px-3 py-1 text-sm bg-gray-100 rounded-full">{a}</li>
+      <li><Badge tone="neutral" size="sm">{a}</Badge></li>
     ))}
   </ul>
 )}

@@ -1,0 +1,82 @@
+---
+/**
+ * FormField primitive.
+ *
+ * Renders a labelled input with optional hint and error text, wired up with
+ * `for` / `aria-describedby` for assistive tech. The visual styling mirrors
+ * the existing LoginForm / MaintenanceForm input look so refactors are
+ * visually neutral.
+ *
+ * For non-input controls (selects, textareas, button groups), callers can
+ * use the default slot which receives focus styling on its descendant input.
+ */
+import type { HTMLAttributes } from 'astro/types'
+type InputType = HTMLAttributes<'input'>['type']
+
+interface Props {
+  label: string
+  name: string
+  type?: InputType
+  required?: boolean
+  error?: string
+  hint?: string
+  value?: string | number
+  placeholder?: string
+  autoComplete?: string
+  disabled?: boolean
+  class?: string
+}
+
+const {
+  label,
+  name,
+  type = 'text',
+  required = false,
+  error,
+  hint,
+  value,
+  placeholder,
+  autoComplete,
+  disabled = false,
+  class: classFromProps = '',
+} = Astro.props
+
+const inputId = name
+const hintId = hint ? `${name}-hint` : undefined
+const errorId = error ? `${name}-error` : undefined
+const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined
+
+const inputCls =
+  'block w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]/40 focus:border-[var(--color-brand)] disabled:bg-gray-100 disabled:cursor-not-allowed'
+
+const hasSlot = Astro.slots.has('default')
+---
+<div class={['space-y-1', classFromProps].filter(Boolean).join(' ')}>
+  <label for={inputId} class="block text-sm font-medium">
+    {label}
+    {required && <span class="text-red-600" aria-hidden="true"> *</span>}
+  </label>
+  {hasSlot ? (
+    <slot />
+  ) : (
+    <input
+      id={inputId}
+      name={name}
+      type={type}
+      required={required}
+      value={value}
+      placeholder={placeholder}
+      autocomplete={autoComplete}
+      disabled={disabled}
+      aria-invalid={error ? 'true' : undefined}
+      aria-describedby={describedBy}
+      class={inputCls}
+    />
+  )}
+  {hint && (
+    <p id={hintId} class="text-xs text-gray-500">{hint}</p>
+  )}
+  {error && (
+    <p id={errorId} class="text-sm text-red-600">{error}</p>
+  )}
+</div>

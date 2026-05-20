@@ -1,0 +1,35 @@
+---
+/**
+ * Alert primitive.
+ *
+ * Inline message banner used for success / warning / error / info states.
+ * Error-toned alerts get `role="alert"` so screen readers announce them
+ * immediately; other tones use `role="status"` for polite announcement.
+ */
+type Tone = 'success' | 'warning' | 'error' | 'info'
+
+interface Props {
+  tone: Tone
+  title?: string
+  class?: string
+  [key: string]: unknown
+}
+
+const { tone, title, class: classFromProps = '', ...rest } = Astro.props
+
+const tones: Record<Tone, string> = {
+  success: 'border-green-300 bg-green-50 text-green-900',
+  warning: 'border-amber-300 bg-amber-50 text-amber-900',
+  error: 'border-red-300 bg-red-50 text-red-800',
+  info: 'border-blue-300 bg-blue-50 text-blue-900',
+}
+
+const role = tone === 'error' ? 'alert' : 'status'
+const cls = ['border rounded-lg px-4 py-3 text-sm', tones[tone], classFromProps]
+  .filter(Boolean)
+  .join(' ')
+---
+<div class={cls} role={role} {...rest}>
+  {title && <p class="font-semibold mb-1">{title}</p>}
+  <slot />
+</div>

@@ -1,9 +1,5 @@
 @import "tailwindcss";
-
-:root {
-  --color-brand: #0a58ca;
-  --color-brand-dark: #0747a6;
-}
+@import "./tokens.css";
 
 html { scroll-behavior: smooth; }
 body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #111; background: #fff; }

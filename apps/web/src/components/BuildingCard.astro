@@ -1,8 +1,9 @@
 ---
+import Card from './primitives/Card.astro'
 interface Props { b: { id: string; slug: string; name: string; address_line1: string; city: string; state: string } }
 const { b } = Astro.props
 ---
-<a href={`/buildings/${b.slug}`} class="block border border-gray-200 rounded-xl p-5 hover:border-[var(--color-brand)] transition">
+<Card as="a" interactive href={`/buildings/${b.slug}`}>
   <h3 class="text-lg font-semibold">{b.name}</h3>
   <p class="text-gray-600 text-sm mt-1">{b.address_line1}, {b.city}, {b.state}</p>
-</a>
+</Card>
