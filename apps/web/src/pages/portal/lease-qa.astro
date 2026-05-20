@@ -1,0 +1,42 @@
+---
+export const prerender = false
+import Base from '../../layouts/Base.astro'
+import PortalNav from '../../components/PortalNav.astro'
+import { getSession } from '../../lib/auth'
+import { findTenantById, leaseForTenant } from '../../lib/tenant-fixtures'
+import { LeaseQa } from '../../components/islands/LeaseQa'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'tenant') {
+  return Astro.redirect('/login?redirect=/portal/lease-qa')
+}
+
+const tenant = findTenantById(session.tenantId)
+if (!tenant) return Astro.redirect('/login')
+
+const lease = leaseForTenant(tenant.id)
+---
+<Base title="Lease Q&A — A &amp; R Management">
+  <PortalNav active="overview" />
+  <div class="max-w-3xl mx-auto px-4 py-8 space-y-6">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight">Lease Q&amp;A</h1>
+      <p class="text-gray-500 mt-1">
+        Ask anything about your lease. Answers cite the specific pages of your lease PDF.
+      </p>
+    </div>
+
+    {lease ? (
+      <LeaseQa client:load />
+    ) : (
+      <div class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+        <p class="font-medium">No active lease on file.</p>
+        <p class="mt-1">Please contact the management office to get set up.</p>
+      </div>
+    )}
+
+    <div class="text-xs text-gray-500">
+      AI answers can be wrong. For anything you'd act on, confirm with the management office.
+    </div>
+  </div>
+</Base>
