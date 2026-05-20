@@ -1,0 +1,133 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import { tenantRequests, tenants } from '../../../lib/tenant-fixtures'
+import { listWorkOrders, listVendors } from '../../../lib/vendors'
+import { computeSla, bucketColor, bucketLabel, formatRemaining, type Urgency } from '../../../lib/sla'
+import { buildings } from '../../../lib/fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/maintenance')
+}
+
+const now = new Date('2026-05-20T12:00:00Z')
+
+const workOrders = await listWorkOrders()
+const vendors = await listVendors({ active_only: false })
+const vendorMap = new Map(vendors.map((v) => [v.id, v]))
+
+const rows = tenantRequests
+  .filter((r) => r.status !== 'closed')
+  .map((r) => {
+    const wo = workOrders.find((w) => w.maintenance_request_id === r.id)
+    const tenant = tenants.find((t) => t.id === r.tenant_id) ?? null
+    const building = buildings.find((b) => b.id === r.building_id) ?? null
+    const sla = computeSla({
+      urgency: r.urgency as Urgency,
+      created_at: r.created_at,
+      acknowledged_at: r.status !== 'new' ? r.updated_at : null,
+      vendor_assigned_at: wo?.assigned_at ?? null,
+      started_at: wo?.started_at ?? null,
+      completed_at: wo?.completed_at ?? null,
+      resolved_at: r.status === 'resolved' ? r.updated_at : null,
+      now,
+    })
+    return { req: r, wo, tenant, building, sla }
+  })
+  .sort((a, b) => {
+    // Worst SLA first, then by newest
+    const rank: Record<string, number> = { breached: 0, warning: 1, 'on-track': 2 }
+    const ra = rank[a.sla.overall] ?? 2
+    const rb = rank[b.sla.overall] ?? 2
+    if (ra !== rb) return ra - rb
+    return b.req.created_at.localeCompare(a.req.created_at)
+  })
+
+const statusPill: Record<string, string> = {
+  new: 'bg-gray-100 text-gray-700',
+  acknowledged: 'bg-blue-100 text-blue-800',
+  in_progress: 'bg-amber-100 text-amber-800',
+  resolved: 'bg-green-100 text-green-800',
+  closed: 'bg-gray-100 text-gray-500',
+}
+
+const urgencyPill: Record<string, string> = {
+  low: 'bg-gray-100 text-gray-600',
+  normal: 'bg-blue-50 text-blue-700',
+  high: 'bg-orange-100 text-orange-700',
+  emergency: 'bg-red-100 text-red-800',
+}
+
+---
+<Base title="Maintenance — Admin — A & R Management">
+  <AdminNav />
+  <div class="max-w-6xl mx-auto px-4 py-10 space-y-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-gray-500 mb-1"><a href="/admin" class="hover:underline">Admin</a> / Maintenance</p>
+        <h1 class="text-3xl font-bold tracking-tight">Maintenance queue</h1>
+        <p class="text-gray-500 mt-1">Open requests sorted by SLA risk.</p>
+      </div>
+      <div class="flex gap-3">
+        <a href="/admin/vendors" class="text-sm text-gray-600 hover:text-gray-900">Vendors →</a>
+        <a href="/admin/maintenance/work-orders" class="text-sm text-gray-600 hover:text-gray-900">Work orders →</a>
+      </div>
+    </div>
+
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200">
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Ref</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Tenant</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Building / Unit</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Issue</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Urgency</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Status</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">SLA</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Vendor</th>
+            <th class="px-3 py-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr><td colspan="9" class="px-3 py-10 text-center text-gray-500">No open maintenance requests.</td></tr>
+          ) : rows.map(({ req, wo, tenant, building, sla }) => (
+            <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+              <td class="px-3 py-3 font-mono text-xs text-gray-700">{req.ref_id}</td>
+              <td class="px-3 py-3 text-gray-800">{tenant?.name ?? '—'}</td>
+              <td class="px-3 py-3 text-gray-700">
+                <p>{building?.name ?? '—'}</p>
+                <p class="text-xs text-gray-500">{req.unit_label}</p>
+              </td>
+              <td class="px-3 py-3 capitalize text-gray-700">{req.issue_type}</td>
+              <td class="px-3 py-3">
+                <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${urgencyPill[req.urgency] ?? ''}`}>{req.urgency}</span>
+              </td>
+              <td class="px-3 py-3">
+                <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusPill[req.status] ?? ''}`}>{req.status.replace('_', ' ')}</span>
+              </td>
+              <td class="px-3 py-3">
+                <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${bucketColor(sla.overall)}`}>{bucketLabel(sla.overall)}</span>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  ack {formatRemaining(sla.ack.remaining_minutes)} · finish {formatRemaining(sla.complete.remaining_minutes)}
+                </p>
+              </td>
+              <td class="px-3 py-3 text-gray-700">
+                {wo ? vendorMap.get(wo.vendor_id)?.name ?? '—' : <span class="text-gray-400">Unassigned</span>}
+              </td>
+              <td class="px-3 py-3 text-right">
+                {!wo && (
+                  <a class="text-[var(--color-brand)] text-sm hover:underline" href={`/admin/maintenance/${req.id}/dispatch`}>Dispatch →</a>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Base>

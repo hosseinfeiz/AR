@@ -1,0 +1,88 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import { listWorkOrders, listVendors } from '../../../lib/vendors'
+import { tenantRequests } from '../../../lib/tenant-fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/maintenance/work-orders')
+}
+
+const orders = await listWorkOrders()
+const vendors = await listVendors({ active_only: false })
+const vendorMap = new Map(vendors.map((v) => [v.id, v]))
+const reqMap = new Map(tenantRequests.map((r) => [r.id, r]))
+
+function fmtTs(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-US')
+}
+
+const statusPill: Record<string, string> = {
+  quoted: 'bg-gray-100 text-gray-700',
+  scheduled: 'bg-blue-100 text-blue-800',
+  in_progress: 'bg-amber-100 text-amber-800',
+  completed: 'bg-green-100 text-green-800',
+  billed: 'bg-slate-200 text-slate-800',
+}
+---
+<Base title="Work orders — Admin — A & R Management">
+  <AdminNav />
+  <div class="max-w-6xl mx-auto px-4 py-10 space-y-6">
+    <div>
+      <p class="text-sm text-gray-500 mb-1">
+        <a href="/admin" class="hover:underline">Admin</a> /
+        <a href="/admin/maintenance" class="hover:underline">Maintenance</a> / Work orders
+      </p>
+      <h1 class="text-3xl font-bold tracking-tight">Work orders</h1>
+      <p class="text-gray-500 mt-1">All vendor dispatches, newest first.</p>
+    </div>
+
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200">
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Request</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Vendor</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Status</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Assigned</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Acknowledged</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Started</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Completed</th>
+            <th class="text-left px-3 py-3 font-semibold text-gray-700">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.length === 0 ? (
+            <tr><td colspan="8" class="px-3 py-10 text-center text-gray-500">No work orders on file.</td></tr>
+          ) : orders.map((w) => {
+            const req = reqMap.get(w.maintenance_request_id)
+            const vendor = vendorMap.get(w.vendor_id)
+            return (
+              <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+                <td class="px-3 py-3">
+                  <p class="font-mono text-xs">{req?.ref_id ?? w.maintenance_request_id}</p>
+                  <p class="text-xs text-gray-500">{req?.unit_label ?? ''}</p>
+                </td>
+                <td class="px-3 py-3 text-gray-800">
+                  {vendor ? <a class="hover:underline" href={`/admin/vendors/${vendor.id}`}>{vendor.name}</a> : '—'}
+                </td>
+                <td class="px-3 py-3">
+                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusPill[w.status] ?? ''}`}>{w.status.replace('_', ' ')}</span>
+                </td>
+                <td class="px-3 py-3 text-gray-600">{fmtTs(w.assigned_at)}</td>
+                <td class="px-3 py-3 text-gray-600">{fmtTs(w.acknowledged_at)}</td>
+                <td class="px-3 py-3 text-gray-600">{fmtTs(w.started_at)}</td>
+                <td class="px-3 py-3 text-gray-600">{fmtTs(w.completed_at)}</td>
+                <td class="px-3 py-3 text-gray-700">{w.cost_cents != null ? `$${(w.cost_cents / 100).toFixed(2)}` : '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Base>

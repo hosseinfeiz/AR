@@ -4,6 +4,7 @@ import Base from '../../layouts/Base.astro'
 import PortalNav from '../../components/PortalNav.astro'
 import { getSession } from '../../lib/auth'
 import { findTenantById, requestsForTenant } from '../../lib/tenant-fixtures'
+import { signToken, getSurveyForRequest } from '../../lib/vendors'
 
 const session = getSession(Astro.cookies)
 if (!session || session.type !== 'tenant') {
@@ -14,6 +15,15 @@ const tenant = findTenantById(session.tenantId)
 if (!tenant) return Astro.redirect('/login')
 
 const requests = requestsForTenant(tenant.id)
+
+// Build survey tokens for resolved requests that haven't been surveyed yet.
+const surveyTokens = new Map<string, string>()
+for (const r of requests) {
+  if (r.status === 'resolved' && !getSurveyForRequest(r.id)) {
+    const token = await signToken({ kind: 'sv', id: r.id, iat: Math.floor(Date.now() / 1000) })
+    surveyTokens.set(r.id, token)
+  }
+}
 
 function fmtTs(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -76,6 +86,12 @@ const urgencyPill: Record<string, string> = {
                   <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusPill[r.status] ?? 'bg-gray-100 text-gray-700'}`}>
                     {r.status.replace('_', ' ')}
                   </span>
+                  {surveyTokens.has(r.id) && (
+                    <a
+                      href={`/maintenance-survey/${encodeURIComponent(surveyTokens.get(r.id) ?? '')}`}
+                      class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-800 hover:bg-violet-200"
+                    >Give feedback →</a>
+                  )}
                 </td>
                 <td class="px-4 py-3">
                   <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${urgencyPill[r.urgency] ?? 'bg-gray-100 text-gray-600'}`}>
