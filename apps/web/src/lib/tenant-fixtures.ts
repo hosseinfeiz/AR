@@ -9,7 +9,9 @@ export interface Tenant {
   unit_id: string
   unit_label: string
   move_in_date: string
-  password: string
+  /** SHA-256 hex digest of the tenant's password. Demo fixtures share the
+   *  hash of "tenant123"; production tenants would have unique per-user hashes. */
+  password_sha256: string
   avatar_initials: string
 }
 
@@ -86,7 +88,7 @@ export const tenants: Tenant[] = [
     unit_id: 'aaaa1111-1111-1111-1111-111111111111',
     unit_label: 'Grass Lake Manor #2A',
     move_in_date: '2025-09-01',
-    password: 'tenant123',
+    password_sha256: 'b4f08230cddd4c1bc52a876e12db534f8b40eedb08ba78a5501d1cdf8eb8cb33',
     avatar_initials: 'SJ',
   },
   {
@@ -98,7 +100,7 @@ export const tenants: Tenant[] = [
     unit_id: 'aaaa2222-2222-2222-2222-222222222222',
     unit_label: 'Grass Lake Manor #3B',
     move_in_date: '2025-10-01',
-    password: 'tenant123',
+    password_sha256: 'b4f08230cddd4c1bc52a876e12db534f8b40eedb08ba78a5501d1cdf8eb8cb33',
     avatar_initials: 'ML',
   },
   {
@@ -110,7 +112,7 @@ export const tenants: Tenant[] = [
     unit_id: 'cccc1111-1111-1111-1111-111111111111',
     unit_label: 'Grass Lake Manor #1D',
     move_in_date: '2025-08-01',
-    password: 'tenant123',
+    password_sha256: 'b4f08230cddd4c1bc52a876e12db534f8b40eedb08ba78a5501d1cdf8eb8cb33',
     avatar_initials: 'ER',
   },
   // Winnetka Manor (3 tenants)
@@ -123,7 +125,7 @@ export const tenants: Tenant[] = [
     unit_id: 'bbbb1111-1111-1111-1111-111111111111',
     unit_label: 'Winnetka Manor #1C',
     move_in_date: '2026-01-01',
-    password: 'tenant123',
+    password_sha256: 'b4f08230cddd4c1bc52a876e12db534f8b40eedb08ba78a5501d1cdf8eb8cb33',
     avatar_initials: 'PP',
   },
   {
@@ -135,7 +137,7 @@ export const tenants: Tenant[] = [
     unit_id: 'bbbb2222-2222-2222-2222-222222222222',
     unit_label: 'Winnetka Manor #4A',
     move_in_date: '2025-11-01',
-    password: 'tenant123',
+    password_sha256: 'b4f08230cddd4c1bc52a876e12db534f8b40eedb08ba78a5501d1cdf8eb8cb33',
     avatar_initials: 'DC',
   },
   {
@@ -147,7 +149,7 @@ export const tenants: Tenant[] = [
     unit_id: 'dddd1111-1111-1111-1111-111111111111',
     unit_label: 'Winnetka Manor #2B',
     move_in_date: '2025-12-01',
-    password: 'tenant123',
+    password_sha256: 'b4f08230cddd4c1bc52a876e12db534f8b40eedb08ba78a5501d1cdf8eb8cb33',
     avatar_initials: 'JA',
   },
 ]

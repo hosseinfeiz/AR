@@ -1,6 +1,6 @@
 export const prerender = false
 import type { APIRoute } from 'astro'
-import { checkAdminCreds, setSessionAdmin, setSessionTenant } from '../../lib/auth'
+import { checkAdminCreds, checkTenantPassword, setSessionAdmin, setSessionTenant } from '../../lib/auth'
 import { findTenantByEmail } from '../../lib/tenant-fixtures'
 
 export const POST: APIRoute = async ({ request, cookies }) => {
@@ -16,7 +16,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   const { username = '', password = '', redirect } = body
 
-  if (checkAdminCreds(username, password)) {
+  if (await checkAdminCreds(username, password)) {
     setSessionAdmin(cookies)
     return new Response(JSON.stringify({ ok: true, redirect: redirect ?? '/admin' }), {
       status: 200,
@@ -25,7 +25,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   const tenant = findTenantByEmail(username)
-  if (tenant && tenant.password === password) {
+  if (tenant && (await checkTenantPassword(tenant.password_sha256, password))) {
     setSessionTenant(cookies, tenant.id)
     return new Response(JSON.stringify({ ok: true, redirect: redirect ?? '/portal' }), {
       status: 200,

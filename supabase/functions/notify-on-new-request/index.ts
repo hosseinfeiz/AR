@@ -11,8 +11,26 @@ interface Webhook {
   schema: 'public'
 }
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let diff = 0
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
+
+  const expected = Deno.env.get('NOTIFY_WEBHOOK_SECRET')
+  if (!expected) {
+    console.error('NOTIFY_WEBHOOK_SECRET unset; refusing to process webhook')
+    return new Response('server misconfigured', { status: 500, headers: corsHeaders })
+  }
+  const provided = req.headers.get('x-webhook-secret') ?? ''
+  if (!timingSafeEqual(provided, expected)) {
+    return new Response('unauthorized', { status: 401, headers: corsHeaders })
+  }
+
   const payload = (await req.json()) as Webhook
   if (payload.type !== 'INSERT') return new Response('ignored', { headers: corsHeaders })
 

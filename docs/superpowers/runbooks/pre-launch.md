@@ -7,6 +7,13 @@
 - [ ] OPEN-4 Apple Developer + Google Play accounts active
 - [ ] OPEN-5 Resend sending domain verified (DKIM, SPF green)
 
+## Security gates (added 2026-05-20 from superpower plan)
+- [ ] `ADMIN_USERNAME` + `ADMIN_PASSWORD_SHA256` set in production env (never use default `admin`/`admin`)
+- [ ] `NOTIFY_WEBHOOK_SECRET` set as a Supabase Edge Function secret AND as a Postgres GUC: `alter database postgres set app.notify_webhook_secret = '<hex>'` — value must match in both places
+- [ ] `managers_allowlist` table seeded with the real list of manager emails before any non-public RLS write is expected to work (the `is_manager()` helper added in migration 20260520000100 returns false for an empty allowlist)
+- [ ] GitHub branch protection on `main`: require PR, 1 approval, all CI checks green, no force-push. (Settings → Branches → Add rule. Cannot be enforced from code.)
+- [ ] Sentry DSN active and `PUBLIC_SENTRY_DSN` env var set on Vercel
+
 ## Database
 - [ ] All migrations applied to production Supabase project
 - [ ] Seed file edited with real addresses + city + zip + manager emails

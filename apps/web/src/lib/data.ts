@@ -10,14 +10,14 @@
 
 import { supabase } from './supabase'
 import { buildings as fixBuildings, units as fixUnits, isMockMode, type FixtureBuilding, type FixtureUnit } from './fixtures'
+import { logger } from './logger'
 
 export type Building = FixtureBuilding
 export type Unit = FixtureUnit
 
 function warnFallback(method: string, err: unknown) {
   const msg = (err as { message?: string })?.message ?? String(err)
-  // eslint-disable-next-line no-console
-  console.warn(`[data:${method}] Supabase query failed; falling back to fixtures. Reason: ${msg}`)
+  logger.warn('data: Supabase query failed; falling back to fixtures', { method, reason: msg })
 }
 
 export async function listBuildings(): Promise<Building[]> {
