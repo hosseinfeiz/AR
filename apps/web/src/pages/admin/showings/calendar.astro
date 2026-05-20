@@ -1,0 +1,151 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import { getAdminClient } from '../../../lib/supabase-admin'
+import { isMockMode, buildings as fixBuildings } from '../../../lib/fixtures'
+import { isGoogleConfigured } from '../../../lib/google-calendar'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/showings/calendar')
+}
+
+const justConnected = Astro.url.searchParams.get('connected') === '1'
+
+interface ShowingRow {
+  id: string
+  ref_id: string
+  building_id: string
+  scheduled_at: string | null
+  prospect_name: string
+  prospect_email: string
+  prospect_phone: string | null
+  status: string
+  no_show_at: string | null
+}
+
+let showings: ShowingRow[] = []
+let connections: { manager_email: string; calendar_id: string; connected_at: string }[] = []
+let degraded = false
+
+if (!isMockMode()) {
+  try {
+    const admin = getAdminClient()
+    const [showRes, connRes] = await Promise.all([
+      admin
+        .from('showing_requests')
+        .select('id, ref_id, building_id, scheduled_at, prospect_name, prospect_email, prospect_phone, status, no_show_at')
+        .in('status', ['scheduled', 'no_show'])
+        .order('scheduled_at', { ascending: true })
+        .limit(100),
+      admin
+        .from('manager_calendar_connections')
+        .select('manager_email, calendar_id, connected_at')
+        .order('connected_at', { ascending: false }),
+    ])
+    showings = (showRes.data ?? []) as ShowingRow[]
+    connections = (connRes.data ?? []) as typeof connections
+  } catch (e) {
+    degraded = true
+    // eslint-disable-next-line no-console
+    console.warn('[admin/showings/calendar] degraded mode', (e as Error).message)
+  }
+}
+
+const env = (Astro.locals as any)?.runtime?.env ?? process.env
+const googleReady = isGoogleConfigured(env as Record<string, string | undefined>)
+
+function fmtDate(s: string | null): string {
+  if (!s) return '—'
+  return new Date(s).toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  })
+}
+function buildingName(id: string): string {
+  return fixBuildings.find((b) => b.id === id)?.name ?? id.slice(0, 8)
+}
+---
+<Base title="Showings calendar — A &amp; R Management">
+  <AdminNav />
+  <div class="max-w-5xl mx-auto px-4 py-10">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-bold tracking-tight">Showings calendar</h1>
+      <a href="/admin" class="text-sm text-gray-500 hover:text-gray-800">← Dashboard</a>
+    </div>
+
+    {justConnected && (
+      <div class="mb-4 border border-green-300 bg-green-50 text-green-900 rounded px-3 py-2 text-sm">
+        Google Calendar connected.
+      </div>
+    )}
+    {degraded && (
+      <div class="mb-4 border border-amber-300 bg-amber-50 text-amber-900 rounded px-3 py-2 text-sm">
+        Supabase unreachable — only showing static data. Run migrations and refresh.
+      </div>
+    )}
+
+    <section class="border border-gray-200 rounded-xl p-5 mb-8">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-lg">Google Calendar connections</h2>
+        {googleReady ? (
+          <a href="/api/oauth/google-calendar/start" class="inline-flex items-center bg-[var(--color-brand)] text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-[var(--color-brand-dark)]">
+            Connect a Google Calendar
+          </a>
+        ) : (
+          <span class="text-sm text-gray-500">Set GOOGLE_OAUTH_* env vars to enable.</span>
+        )}
+      </div>
+      {connections.length === 0 ? (
+        <p class="mt-3 text-sm text-gray-600">No managers have connected Google Calendar yet.</p>
+      ) : (
+        <ul class="mt-3 space-y-1 text-sm">
+          {connections.map((c) => (
+            <li class="flex items-center justify-between border-t border-gray-100 py-2">
+              <span>{c.manager_email} <span class="text-gray-400">— {c.calendar_id}</span></span>
+              <span class="text-xs text-gray-500">connected {new Date(c.connected_at).toLocaleDateString()}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section class="border border-gray-200 rounded-xl p-5">
+      <h2 class="font-semibold text-lg mb-4">Upcoming showings</h2>
+      {showings.length === 0 ? (
+        <p class="text-sm text-gray-600">No scheduled showings.</p>
+      ) : (
+        <table class="w-full text-sm">
+          <thead class="text-left text-gray-500">
+            <tr>
+              <th class="py-2">When</th>
+              <th class="py-2">Building</th>
+              <th class="py-2">Prospect</th>
+              <th class="py-2">Status</th>
+              <th class="py-2">Ref</th>
+            </tr>
+          </thead>
+          <tbody>
+            {showings.map((s) => (
+              <tr class="border-t border-gray-100">
+                <td class="py-2">{fmtDate(s.scheduled_at)}</td>
+                <td class="py-2">{buildingName(s.building_id)}</td>
+                <td class="py-2">{s.prospect_name} <span class="text-gray-400">&lt;{s.prospect_email}&gt;</span></td>
+                <td class="py-2">
+                  {s.no_show_at ? (
+                    <span class="text-red-700 font-medium">no-show</span>
+                  ) : (
+                    <span class="text-gray-700">{s.status}</span>
+                  )}
+                </td>
+                <td class="py-2 font-mono text-xs">{s.ref_id}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  </div>
+</Base>
