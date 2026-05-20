@@ -1,7 +1,10 @@
 ---
 import Base from '../../layouts/Base.astro'
 import PhotoGallery from '../../components/PhotoGallery.astro'
+import BuildingHero from '../../components/BuildingHero.astro'
+import { FavoritesButton } from '../../components/islands/FavoritesButton'
 import { getUnitById } from '../../lib/data'
+import { buildApartmentJsonLd, type JsonLdBuilding, type JsonLdUnit } from '../../lib/jsonld'
 
 // Public marketing page — safe to cache at the edge. 30m fresh, 24h SWR.
 Astro.response.headers.set('Cache-Control', 'public, s-maxage=1800, stale-while-revalidate=86400')
@@ -11,37 +14,29 @@ const unit = await getUnitById(id!)
 if (!unit || !unit.building) return Astro.redirect('/404')
 
 const beds = unit.bedrooms === 0 ? 'Studio' : `${unit.bedrooms} bedroom`
-const rent = (unit.monthly_rent_cents / 100).toFixed(2)
 
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'Apartment',
-  name: `Unit ${unit.unit_number} at ${unit.building.name}`,
-  address: {
-    '@type': 'PostalAddress',
-    streetAddress: unit.building.address_line1,
-    addressLocality: unit.building.city,
-    addressRegion: unit.building.state,
-    postalCode: unit.building.postal_code,
-    addressCountry: unit.building.country,
-  },
-  numberOfRooms: unit.bedrooms,
-  numberOfBathroomsTotal: unit.bathrooms,
-  ...(unit.sqft && { floorSize: { '@type': 'QuantitativeValue', value: unit.sqft, unitCode: 'FTK' } }),
-  offers: {
-    '@type': 'Offer',
-    price: rent,
-    priceCurrency: 'USD',
-    availability: 'https://schema.org/InStock',
-    ...(unit.available_from && { availabilityStarts: unit.available_from }),
-  },
-}
+const baseUrl = Astro.site?.toString().replace(/\/$/, '')
+const unitUrl = baseUrl ? `${baseUrl}/units/${unit.id}` : undefined
+const jsonLd = buildApartmentJsonLd(
+  {
+    id: unit.id,
+    unit_number: unit.unit_number,
+    bedrooms: unit.bedrooms,
+    bathrooms: unit.bathrooms,
+    sqft: unit.sqft,
+    monthly_rent_cents: unit.monthly_rent_cents,
+    available_from: unit.available_from,
+  } satisfies JsonLdUnit,
+  unit.building as JsonLdBuilding,
+  unitUrl,
+)
 
 // Prefer unit photos; fall back to the parent building's hero so the unit page
 // is never photo-empty.
 const ownPhotos = (unit.unit_photos ?? []).sort((a, b) => a.sort_order - b.sort_order)
 const fallbackPhotos = (unit.building.building_photos ?? []).sort((a, b) => a.sort_order - b.sort_order)
 const photos = ownPhotos.length > 0 ? ownPhotos : fallbackPhotos
+const heroPhoto = photos[0]
 ---
 <Base
   title={`Unit ${unit.unit_number} at ${unit.building.name} — $${(unit.monthly_rent_cents/100).toLocaleString()}/mo`}
@@ -50,17 +45,18 @@ const photos = ownPhotos.length > 0 ? ownPhotos : fallbackPhotos
 >
   <section class="max-w-5xl mx-auto px-4 py-10">
     <a href={`/buildings/${unit.building.slug}`} class="text-sm text-[var(--color-brand)] hover:underline">← Back to {unit.building.name}</a>
-    <h1 class="text-3xl font-bold mt-2">Unit {unit.unit_number}</h1>
-    <p class="text-gray-600">{unit.building.name}</p>
+    <div class="flex items-start justify-between gap-4 mt-2">
+      <div>
+        <h1 class="text-3xl font-bold">Unit {unit.unit_number}</h1>
+        <p class="text-gray-600">{unit.building.name}</p>
+      </div>
+      <FavoritesButton client:load id={unit.id} kind="unit" label="Save" className="inline-flex items-center px-3 py-2 rounded-lg border border-gray-200 hover:border-[var(--color-brand)] text-sm text-gray-700" />
+    </div>
   </section>
 
-  {photos.length > 0 && (
+  {heroPhoto && (
     <section class="max-w-5xl mx-auto px-4 pb-6">
-      <img
-        src={photos[0]!.storage_path}
-        alt={photos[0]!.alt_text}
-        class="w-full max-h-[480px] object-cover rounded-xl"
-      />
+      <BuildingHero storagePath={heroPhoto.storage_path} alt={heroPhoto.alt_text} />
       {photos.length > 1 && (
         <div class="mt-3">
           <PhotoGallery photos={photos.slice(1)} />
@@ -79,7 +75,8 @@ const photos = ownPhotos.length > 0 ? ownPhotos : fallbackPhotos
     <p class="prose">{unit.description_md}</p>
   </section>
 
-  <section class="max-w-5xl mx-auto px-4 py-6 pb-16">
+  <section class="max-w-5xl mx-auto px-4 py-6 pb-16 flex flex-wrap gap-3">
     <a href={`/schedule?unit=${unit.id}`} class="inline-block bg-[var(--color-brand)] text-white px-5 py-2.5 rounded font-medium hover:bg-[var(--color-brand-dark)]">Schedule a showing</a>
+    <a href="/favorites" class="inline-block border border-gray-200 px-5 py-2.5 rounded font-medium hover:border-[var(--color-brand)]">Compare with my saved units →</a>
   </section>
 </Base>

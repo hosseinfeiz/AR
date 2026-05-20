@@ -1,9 +1,28 @@
 ---
 import Card from './primitives/Card.astro'
-interface Props { b: { id: string; slug: string; name: string; address_line1: string; city: string; state: string } }
-const { b } = Astro.props
+import { FavoritesButton } from './islands/FavoritesButton'
+
+interface Props {
+  b: { id: string; slug: string; name: string; address_line1: string; city: string; state: string }
+  showFavorite?: boolean
+}
+const { b, showFavorite = true } = Astro.props
 ---
-<Card as="a" interactive href={`/buildings/${b.slug}`}>
-  <h3 class="text-lg font-semibold">{b.name}</h3>
-  <p class="text-gray-600 text-sm mt-1">{b.address_line1}, {b.city}, {b.state}</p>
-</Card>
+<div
+  class="relative"
+  data-building-id={b.id}
+  data-building-slug={b.slug}
+  data-building-name={b.name}
+>
+  <Card as="a" interactive href={`/buildings/${b.slug}`}>
+    <div class="pr-10">
+      <h3 class="text-lg font-semibold">{b.name}</h3>
+      <p class="text-gray-600 text-sm mt-1">{b.address_line1}, {b.city}, {b.state}</p>
+    </div>
+  </Card>
+  {showFavorite && (
+    <div class="absolute top-3 right-3">
+      <FavoritesButton client:load id={b.id} kind="building" />
+    </div>
+  )}
+</div>

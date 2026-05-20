@@ -34,6 +34,7 @@
     "@tailwindcss/vite": "^4.2.4",
     "stripe": "^22.1.1",
     "astro": "^6.2.1",
+    "mapbox-gl": "^3.6.0",
     "openai": "^4.78.1",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
