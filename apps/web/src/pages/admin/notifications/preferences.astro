@@ -1,0 +1,165 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import {
+  getManagerPreferences,
+  DEFAULT_PREFS,
+  type ManagerPreferences,
+} from '../../../lib/notifications'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/notifications/preferences')
+}
+
+const FALLBACK_MANAGER_EMAIL = 'admin@ar-management.example'
+const headerEmail = Astro.request.headers.get('x-manager-email') ?? ''
+const managerEmail =
+  headerEmail && headerEmail.includes('@') ? headerEmail : FALLBACK_MANAGER_EMAIL
+
+let prefs: ManagerPreferences | null = null
+try {
+  prefs = await getManagerPreferences(managerEmail)
+} catch (e) {
+  // Degrade silently — DB may not be reachable in dev/mock mode.
+  console.warn('[admin/notifications/preferences] getManagerPreferences failed', e)
+}
+const current = prefs ?? { ...DEFAULT_PREFS, manager_email: managerEmail }
+
+const filters = (current.filters ?? {}) as Record<string, unknown>
+const urgenciesSet = new Set(Array.isArray(filters.urgencies) ? (filters.urgencies as string[]) : [])
+const kindsSet = new Set(Array.isArray(filters.kinds) ? (filters.kinds as string[]) : [])
+const issuesList = Array.isArray(filters.issues) ? (filters.issues as string[]).join(',') : ''
+---
+<Base title="Notification preferences — Admin — A & R Management">
+  <AdminNav />
+  <div class="max-w-3xl mx-auto px-4 py-8">
+    <p class="text-sm text-gray-500 mb-1">
+      <a href="/admin" class="hover:underline">Admin</a> /
+      <a href="/admin/notifications/inbox" class="hover:underline">Notifications</a> / Preferences
+    </p>
+    <h1 class="text-2xl font-bold tracking-tight mb-2">Notification preferences</h1>
+    <p class="text-sm text-gray-600 mb-6">Manager: <code>{managerEmail}</code></p>
+
+    <form id="prefs-form" class="space-y-6">
+      <div class="border border-gray-200 rounded-xl p-5">
+        <h2 class="font-semibold mb-1">Quiet hours</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          During quiet hours, notifications are added to the next digest instead of emailed immediately.
+          Emergency-urgency requests still send through.
+        </p>
+        <div class="grid grid-cols-2 gap-4">
+          <label class="block text-sm">
+            <span class="text-gray-700">Start</span>
+            <input type="time" name="quiet_hours_start" value={current.quiet_hours_start ?? ''}
+              class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </label>
+          <label class="block text-sm">
+            <span class="text-gray-700">End</span>
+            <input type="time" name="quiet_hours_end" value={current.quiet_hours_end ?? ''}
+              class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </label>
+        </div>
+      </div>
+
+      <div class="border border-gray-200 rounded-xl p-5">
+        <h2 class="font-semibold mb-1">Batching</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          Send a digest once N items accumulate (1 = always deliver each notification immediately).
+        </p>
+        <label class="block text-sm">
+          <span class="text-gray-700">Batch after count</span>
+          <input type="number" name="batch_after_count" min="1" max="50" value={current.batch_after_count}
+            class="mt-1 block w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+      </div>
+
+      <div class="border border-gray-200 rounded-xl p-5">
+        <h2 class="font-semibold mb-1">Filters</h2>
+        <p class="text-sm text-gray-500 mb-4">
+          Restrict which notifications you want to be notified about. Unchecked = receive all.
+        </p>
+
+        <fieldset class="mb-4">
+          <legend class="text-sm font-medium text-gray-700">Urgencies</legend>
+          <div class="flex flex-wrap gap-3 mt-1">
+            {['emergency', 'high', 'normal', 'low'].map((u) => (
+              <label class="text-sm inline-flex items-center gap-1.5">
+                <input type="checkbox" name="urgencies" value={u} checked={urgenciesSet.has(u)} />
+                <span>{u}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset class="mb-4">
+          <legend class="text-sm font-medium text-gray-700">Kinds</legend>
+          <div class="flex flex-wrap gap-3 mt-1">
+            {['maintenance_request', 'showing_request', 'digest', 'system'].map((k) => (
+              <label class="text-sm inline-flex items-center gap-1.5">
+                <input type="checkbox" name="kinds" value={k} checked={kindsSet.has(k)} />
+                <span>{k}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <label class="block text-sm">
+          <span class="text-gray-700">Issue types (comma-separated)</span>
+          <input type="text" name="issues" value={issuesList} placeholder="plumbing, electrical, hvac"
+            class="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </label>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button type="submit"
+          class="bg-[var(--color-brand)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-brand-dark)] transition">
+          Save preferences
+        </button>
+        <span id="prefs-status" class="text-sm text-gray-500"></span>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('prefs-form') as HTMLFormElement | null
+    const status = document.getElementById('prefs-status') as HTMLSpanElement | null
+    if (form) {
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault()
+        if (status) status.textContent = 'Saving...'
+        const fd = new FormData(form)
+        const urgencies = fd.getAll('urgencies').map(String)
+        const kinds = fd.getAll('kinds').map(String)
+        const issuesStr = String(fd.get('issues') ?? '')
+        const issues = issuesStr
+          .split(',')
+          .map((s) => s.trim().toLowerCase())
+          .filter(Boolean)
+        const payload = {
+          quiet_hours_start: String(fd.get('quiet_hours_start') ?? '') || null,
+          quiet_hours_end: String(fd.get('quiet_hours_end') ?? '') || null,
+          batch_after_count: Number(fd.get('batch_after_count') ?? 1),
+          filters: { urgencies, kinds, issues },
+        }
+        try {
+          const r = await fetch('/api/admin/notifications/preferences', {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          const j = (await r.json()) as { ok?: boolean; error?: string }
+          if (j.ok) {
+            if (status) status.textContent = 'Saved.'
+          } else {
+            if (status) status.textContent = 'Failed: ' + (j.error ?? 'unknown')
+          }
+        } catch (e) {
+          if (status) status.textContent = 'Failed: ' + (e as Error).message
+        }
+      })
+    }
+  </script>
+</Base>
