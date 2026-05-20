@@ -1,6 +1,7 @@
 ---
 import Card from './primitives/Card.astro'
 import { FavoritesButton } from './islands/FavoritesButton'
+import RentCompBadge from './RentCompBadge.astro'
 
 interface Props {
   u: {
@@ -40,6 +41,7 @@ const dataAttrs = {
     {u.building && <p class="text-sm text-gray-500">{u.building.name}</p>}
     <p class="text-sm text-gray-700 mt-2">{beds} · {u.bathrooms} ba{u.sqft ? ` · ${u.sqft} sqft` : ''}</p>
     {u.available_from && <p class="text-xs text-gray-500 mt-2">Available {u.available_from}</p>}
+    <RentCompBadge unitId={u.id} />
   </Card>
   {showFavorite && (
     <div class="absolute top-3 right-3">

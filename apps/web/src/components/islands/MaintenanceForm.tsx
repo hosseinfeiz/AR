@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { MaintenanceRequestInputSchema, type MaintenanceRequestInput } from '@ar/shared'
 import { TurnstileWidget } from './TurnstileWidget'
 import { PhotoUploader } from './PhotoUploader'
+import { MaintenanceTriageHint } from './MaintenanceTriageHint'
 
 interface Props {
   supabaseUrl: string
@@ -185,6 +186,7 @@ export function MaintenanceForm({ supabaseUrl, anonKey, turnstileSiteKey, buildi
       <label className={labelCls}>Description <span className="text-red-600">*</span></label>
       <textarea {...register('description')} rows={4} className={inputCls} placeholder="Describe the issue (at least 10 characters)" />
       {errors.description && <p className={errCls}>{errors.description.message ?? 'Description is required (min 10 characters).'}</p>}
+      <MaintenanceTriageHint description={watch('description') ?? ''} issueType={issueType ?? null} urgency={urgency ?? null} />
 
       <label className={labelCls}>Photos <span className="text-gray-500 text-xs">(optional, up to 5)</span></label>
       {mockMode ? (
