@@ -41,3 +41,7 @@ All commands are run from the root of the project, from a terminal:
 ## 👀 Want to learn more?
 
 Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+
+## ⚡ Performance
+
+Hybrid rendering: marketing pages with no per-request state (`/`, `/about`, `/contact`, `/privacy`, `/terms`) are prerendered to static HTML at build time. Dynamic public routes (`/listings`, `/buildings/[slug]`, `/units/[id]`) stay SSR but set `Cache-Control: public, s-maxage=1800, stale-while-revalidate=86400` so Vercel / Cloudflare cache them at the edge. Authenticated routes (`/portal/*`, `/admin/*`, `/login`, `/maintenance`, `/schedule`, `/api/*`) stay SSR with `private, no-cache` (configured in `vercel.json` and `public/_headers`).

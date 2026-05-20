@@ -4,6 +4,9 @@ import Base from '../layouts/Base.astro'
 import UnitCard from '../components/UnitCard.astro'
 import { listBuildings, listAvailableUnits } from '../lib/data'
 
+// Public marketing page — Vercel/CF cache per URL (including ?filters). 30m fresh, 24h SWR.
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=1800, stale-while-revalidate=86400')
+
 const buildingFilter = Astro.url.searchParams.get('building') ?? null
 const bedsFilter = Astro.url.searchParams.get('bedrooms')
 const maxRent = Astro.url.searchParams.get('max_rent')

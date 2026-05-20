@@ -1,0 +1,33 @@
+# Cloudflare Pages / Workers Assets headers.
+# Vercel reads vercel.json's `headers` block; keep these two in sync.
+#
+# Build assets — content-hashed, safe to cache forever.
+/public/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Building / unit photos — versioned by filename, safe to cache forever.
+/buildings/*.png
+  Cache-Control: public, max-age=31536000, immutable
+/buildings/*.jpg
+  Cache-Control: public, max-age=31536000, immutable
+/buildings/*.jpeg
+  Cache-Control: public, max-age=31536000, immutable
+/buildings/*.webp
+  Cache-Control: public, max-age=31536000, immutable
+/buildings/*.avif
+  Cache-Control: public, max-age=31536000, immutable
+/buildings/*.svg
+  Cache-Control: public, max-age=31536000, immutable
+
+/favicon.ico
+  Cache-Control: public, max-age=31536000, immutable
+
+# Auth + personalized routes — never cache.
+/api/login
+  Cache-Control: private, no-cache
+/api/logout
+  Cache-Control: private, no-cache
+/portal/*
+  Cache-Control: private, no-cache
+/admin/*
+  Cache-Control: private, no-cache
