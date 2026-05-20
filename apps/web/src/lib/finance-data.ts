@@ -1,13 +1,31 @@
 // Finance data layer — combines income (tenant payments) + expenses for reports.
 // All money in cents. Today's reference date: 2026-05-04.
 
-import { payments, charges, leases, tenants } from './tenant-fixtures'
+import { payments, charges, leases, tenants, type Tenant } from './tenant-fixtures'
 import {
   totalExpenses,
   expensesByCategory,
   type ExpenseCategory,
 } from './finance-fixtures'
 import { buildings } from './fixtures'
+
+// ---------------------------------------------------------------------------
+// Module-level lookup maps (built once at module load).
+// These replace per-row Array.find() calls (O(n²) -> O(n)) for hot paths
+// like getRentRoll / getIncomeForRange. The fixtures are static for the
+// lifetime of the process, so caching at module scope is safe.
+// ---------------------------------------------------------------------------
+const tenantById: Map<string, Tenant> = new Map(tenants.map((t) => [t.id, t]))
+
+// Map charge_id -> building_id (resolved via charge.tenant_id -> tenant.building_id).
+const chargeIdToBuilding: Map<string, string> = new Map(
+  charges
+    .map((c) => {
+      const t = tenantById.get(c.tenant_id)
+      return t ? ([c.id, t.building_id] as const) : null
+    })
+    .filter((x): x is readonly [string, string] => x !== null),
+)
 
 export const TODAY = '2026-05-04'
 
@@ -44,19 +62,13 @@ export function getIncomeForRange(opts: {
 }): number {
   const { from, to, building_id } = opts
 
-  // Build a map of charge_id → building_id via lease → unit (tenant.building_id)
-  const chargeBuilding = new Map<string, string>()
-  for (const charge of charges) {
-    const tenant = tenants.find((t) => t.id === charge.tenant_id)
-    if (tenant) chargeBuilding.set(charge.id, tenant.building_id)
-  }
-
+  // chargeIdToBuilding is precomputed at module load — no per-call rebuild.
   return payments
     .filter((p) => {
       const date = p.paid_at.slice(0, 10)
       if (date < from || date > to) return false
       if (building_id) {
-        const bId = chargeBuilding.get(p.charge_id)
+        const bId = chargeIdToBuilding.get(p.charge_id)
         if (bId !== building_id) return false
       }
       return true
@@ -99,6 +111,21 @@ export function getMonthlyTotals(opts: {
   const start = new Date(opts.from + 'T00:00:00Z')
   const end = new Date(opts.to + 'T00:00:00Z')
 
+  // Build a single map of 'YYYY-MM' -> income_cents covering the full window
+  // up front so the per-month loop is a Map lookup instead of an O(payments)
+  // re-scan per month. Expenses are similarly bucketed.
+  const incomeByMonth = new Map<string, number>()
+  for (const p of payments) {
+    const date = p.paid_at.slice(0, 10)
+    if (date < opts.from || date > opts.to) continue
+    if (opts.building_id) {
+      const bId = chargeIdToBuilding.get(p.charge_id)
+      if (bId !== opts.building_id) continue
+    }
+    const monthKey = date.slice(0, 7)
+    incomeByMonth.set(monthKey, (incomeByMonth.get(monthKey) ?? 0) + p.amount_cents)
+  }
+
   // Iterate month by month
   const cur = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1))
   while (cur <= end) {
@@ -110,11 +137,7 @@ export function getMonthlyTotals(opts: {
     const lastDay = new Date(Date.UTC(year, cur.getUTCMonth() + 1, 0))
     const monthEnd = lastDay.toISOString().slice(0, 10)
 
-    const income_cents = getIncomeForRange({
-      from: monthStart,
-      to: monthEnd,
-      building_id: opts.building_id,
-    })
+    const income_cents = incomeByMonth.get(monthStr) ?? 0
     const expense_cents = getExpenseForRange({
       from: monthStart,
       to: monthEnd,
@@ -143,16 +166,25 @@ export function getRentRoll(asOf?: string): {
   const ref = asOf ?? TODAY
   const refMonth = ref.slice(0, 7) // 'YYYY-MM'
 
+  // Build a tenant_id -> charge map for the reference month once, instead of
+  // re-scanning `charges` for every lease. Preserves prior behavior: prior
+  // code used Array.find() which returned the FIRST matching charge in source
+  // order, so we mirror that by only setting if not already present.
+  const chargeByTenantForMonth = new Map<string, (typeof charges)[number]>()
+  for (const c of charges) {
+    if (!c.due_date.startsWith(refMonth)) continue
+    if (!chargeByTenantForMonth.has(c.tenant_id)) {
+      chargeByTenantForMonth.set(c.tenant_id, c)
+    }
+  }
+
   return leases
     .filter((l) => l.status === 'active')
     .map((lease) => {
-      const tenant = tenants.find((t) => t.id === lease.tenant_id)
+      const tenant = tenantById.get(lease.tenant_id)
       if (!tenant) return null
 
-      // Find the charge for the current month
-      const currentCharge = charges.find((c) => {
-        return c.tenant_id === lease.tenant_id && c.due_date.startsWith(refMonth)
-      })
+      const currentCharge = chargeByTenantForMonth.get(lease.tenant_id)
 
       let current_month_status: 'paid' | 'due' | 'overdue' | 'no_charge' = 'no_charge'
       if (currentCharge) {

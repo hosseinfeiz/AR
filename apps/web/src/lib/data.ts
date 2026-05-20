@@ -15,6 +15,18 @@ import { logger } from './logger'
 export type Building = FixtureBuilding
 export type Unit = FixtureUnit
 
+// Explicit column lists used by Supabase .select() calls.
+// Kept in sync with FixtureBuilding / FixtureUnit so the returned rows match
+// the typed shape exactly (no payload-bloating SELECT * over the wire).
+const BUILDING_COLS =
+  'id, slug, name, address_line1, address_line2, city, state, postal_code, country, ' +
+  'description_md, neighborhood_md, amenities, contact_phone, contact_email, ' +
+  'seo_title, seo_description, is_published'
+
+const UNIT_COLS =
+  'id, building_id, unit_number, bedrooms, bathrooms, sqft, monthly_rent_cents, ' +
+  'available_from, status, description_md'
+
 function warnFallback(method: string, err: unknown) {
   const msg = (err as { message?: string })?.message ?? String(err)
   logger.warn('data: Supabase query failed; falling back to fixtures', { method, reason: msg })
@@ -43,7 +55,7 @@ export async function getBuildingBySlug(slug: string): Promise<Building | null> 
   try {
     const { data, error } = await supabase
       .from('buildings')
-      .select('*, building_photos(storage_path, alt_text, sort_order)')
+      .select(`${BUILDING_COLS}, building_photos(storage_path, alt_text, sort_order)`)
       .eq('slug', slug)
       .eq('is_published', true)
       .maybeSingle()
@@ -116,7 +128,9 @@ export async function getUnitById(id: string): Promise<Unit | null> {
   try {
     const { data, error } = await supabase
       .from('units')
-      .select('*, unit_photos(storage_path, alt_text, sort_order), building:buildings(*)')
+      .select(
+        `${UNIT_COLS}, unit_photos(storage_path, alt_text, sort_order), building:buildings(${BUILDING_COLS})`,
+      )
       .eq('id', id)
       .maybeSingle()
     if (error) throw error
