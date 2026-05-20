@@ -1,0 +1,40 @@
+---
+/**
+ * Badge primitive.
+ *
+ * Inline pill used for amenities, statuses, and labels. Tones map to the
+ * semantic color tokens; visual treatment uses neutral Tailwind colors for
+ * now (a future dark-mode pass will swap these for token references).
+ */
+type Tone = 'neutral' | 'success' | 'warning' | 'error' | 'info'
+type Size = 'sm' | 'md'
+
+interface Props {
+  tone?: Tone
+  size?: Size
+  class?: string
+  [key: string]: unknown
+}
+
+const { tone = 'neutral', size = 'md', class: classFromProps = '', ...rest } = Astro.props
+
+const tones: Record<Tone, string> = {
+  neutral: 'bg-gray-100 text-gray-800',
+  success: 'bg-green-100 text-green-800',
+  warning: 'bg-amber-100 text-amber-800',
+  error: 'bg-red-100 text-red-800',
+  info: 'bg-blue-100 text-blue-800',
+}
+
+const sizes: Record<Size, string> = {
+  sm: 'text-xs px-2 py-0.5',
+  md: 'text-sm px-3 py-1',
+}
+
+const cls = ['inline-flex items-center rounded-full font-medium', tones[tone], sizes[size], classFromProps]
+  .filter(Boolean)
+  .join(' ')
+---
+<span class={cls} {...rest}>
+  <slot />
+</span>

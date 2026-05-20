@@ -1,0 +1,57 @@
+---
+/**
+ * Button primitive.
+ *
+ * Renders a <button> by default, or an <a> when `href` is set. Variants and
+ * sizes are intentionally limited so the design system stays small.
+ */
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type Size = 'sm' | 'md' | 'lg'
+
+interface Props {
+  variant?: Variant
+  size?: Size
+  type?: 'button' | 'submit' | 'reset'
+  disabled?: boolean
+  href?: string
+  class?: string
+  [key: string]: unknown
+}
+
+const {
+  variant = 'primary',
+  size = 'md',
+  type = 'button',
+  disabled = false,
+  href,
+  class: classFromProps = '',
+  ...rest
+} = Astro.props
+
+const base =
+  'inline-flex items-center justify-center font-medium rounded-lg transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand)]/40 disabled:cursor-not-allowed'
+
+const variants: Record<Variant, string> = {
+  primary: 'bg-[var(--color-brand)] text-white hover:bg-[var(--color-brand-dark)] disabled:bg-gray-400',
+  secondary: 'bg-white text-gray-900 border border-gray-300 hover:border-[var(--color-brand)] hover:text-[var(--color-brand)] disabled:opacity-50',
+  ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 disabled:opacity-50',
+  danger: 'bg-[var(--color-error)] text-white hover:opacity-90 disabled:opacity-50',
+}
+
+const sizes: Record<Size, string> = {
+  sm: 'text-xs px-3 py-1.5',
+  md: 'text-sm px-4 py-2',
+  lg: 'text-base px-5 py-2.5',
+}
+
+const cls = [base, variants[variant], sizes[size], classFromProps].filter(Boolean).join(' ')
+---
+{href ? (
+  <a href={href} class={cls} aria-disabled={disabled ? 'true' : undefined} {...rest}>
+    <slot />
+  </a>
+) : (
+  <button type={type} disabled={disabled} class={cls} {...rest}>
+    <slot />
+  </button>
+)}

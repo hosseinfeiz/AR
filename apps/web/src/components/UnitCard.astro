@@ -1,4 +1,5 @@
 ---
+import Card from './primitives/Card.astro'
 interface Props {
   u: {
     id: string
@@ -15,7 +16,7 @@ const { u } = Astro.props
 const beds = u.bedrooms === 0 ? 'Studio' : `${u.bedrooms} bd`
 const rent = `$${(u.monthly_rent_cents / 100).toLocaleString()}`
 ---
-<a href={`/units/${u.id}`} class="block border border-gray-200 rounded-xl p-5 hover:border-[var(--color-brand)] transition">
+<Card as="a" interactive href={`/units/${u.id}`}>
   <div class="flex items-baseline justify-between">
     <h3 class="text-lg font-semibold">Unit {u.unit_number}</h3>
     <span class="text-lg font-bold">{rent}<span class="text-sm font-normal text-gray-500">/mo</span></span>
@@ -23,4 +24,4 @@ const rent = `$${(u.monthly_rent_cents / 100).toLocaleString()}`
   {u.building && <p class="text-sm text-gray-500">{u.building.name}</p>}
   <p class="text-sm text-gray-700 mt-2">{beds} · {u.bathrooms} ba{u.sqft ? ` · ${u.sqft} sqft` : ''}</p>
   {u.available_from && <p class="text-xs text-gray-500 mt-2">Available {u.available_from}</p>}
-</a>
+</Card>

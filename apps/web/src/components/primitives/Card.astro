@@ -1,0 +1,51 @@
+---
+/**
+ * Card primitive.
+ *
+ * Surface container with optional header/footer slots. `interactive` adds a
+ * hover ring so a card that wraps a link reads as clickable.
+ *
+ * The `as` prop lets callers render the outer element as a link, button, or
+ * other tag while keeping the visual treatment. We accept any string here
+ * because Astro renders the tag name verbatim.
+ */
+interface Props {
+  as?: string
+  padded?: boolean
+  interactive?: boolean
+  class?: string
+  [key: string]: unknown
+}
+
+const props = Astro.props as Props
+const {
+  as = 'div',
+  padded = true,
+  interactive = false,
+  class: classFromProps = '',
+  ...rest
+} = props
+const Tag = as as any
+
+const base = 'block border border-gray-200 rounded-xl bg-white'
+const padding = padded ? 'p-5' : ''
+const hover = interactive ? 'hover:border-[var(--color-brand)] transition' : ''
+
+const cls = [base, padding, hover, classFromProps].filter(Boolean).join(' ')
+
+const hasHeader = Astro.slots.has('header')
+const hasFooter = Astro.slots.has('footer')
+---
+<Tag class={cls} {...rest}>
+  {hasHeader && (
+    <div class="mb-3">
+      <slot name="header" />
+    </div>
+  )}
+  <slot />
+  {hasFooter && (
+    <div class="mt-3">
+      <slot name="footer" />
+    </div>
+  )}
+</Tag>
