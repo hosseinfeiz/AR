@@ -45,3 +45,11 @@ Feel free to check [our documentation](https://docs.astro.build) or jump into ou
 ## ⚡ Performance
 
 Hybrid rendering: marketing pages with no per-request state (`/`, `/about`, `/contact`, `/privacy`, `/terms`) are prerendered to static HTML at build time. Dynamic public routes (`/listings`, `/buildings/[slug]`, `/units/[id]`) stay SSR but set `Cache-Control: public, s-maxage=1800, stale-while-revalidate=86400` so Vercel / Cloudflare cache them at the edge. Authenticated routes (`/portal/*`, `/admin/*`, `/login`, `/maintenance`, `/schedule`, `/api/*`) stay SSR with `private, no-cache` (configured in `vercel.json` and `public/_headers`).
+
+## Testing
+
+Run from the repo root:
+
+- `pnpm --filter @ar/web test` — Vitest unit tests (auth helpers, email render contract, data-layer fallback, logger, middleware, photo URLs).
+- `pnpm --filter @ar/web test:e2e` — Playwright end-to-end specs (browse, a11y, maintenance submit, showing submit). Set `E2E_SUBMIT=true` to exercise the actual form submission paths against a configured backend.
+- `supabase db execute < supabase/tests/rls.spec.sql` — RLS policy smoke tests against a `supabase db reset`-ed local database. See `supabase/tests/README.md` for details.
