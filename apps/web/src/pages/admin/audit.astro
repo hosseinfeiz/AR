@@ -1,0 +1,200 @@
+---
+export const prerender = false
+import Base from '../../layouts/Base.astro'
+import AdminNav from '../../components/AdminNav.astro'
+import { getSession } from '../../lib/auth'
+import { isMockMode } from '../../lib/fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect('/login?redirect=/admin/audit')
+}
+
+// Filter inputs (server-rendered, query-string driven).
+const url = Astro.url
+const fTable = url.searchParams.get('table') ?? ''
+const fAction = url.searchParams.get('action') ?? ''
+const fFrom = url.searchParams.get('from') ?? ''
+const fTo = url.searchParams.get('to') ?? ''
+
+// Tables on which audit triggers fire — used to populate the dropdown.
+const TABLE_OPTIONS = [
+  'tenants',
+  'leases',
+  'charges',
+  'payments',
+  'tenant_requests',
+  'messages',
+  'buildings',
+  'units',
+  'showing_requests',
+  'maintenance_requests',
+]
+
+const ACTION_OPTIONS = ['insert', 'update', 'delete', 'status_change'] as const
+
+interface AuditRow {
+  id: number
+  table_name: string
+  record_id: string
+  action: string
+  actor_id: string | null
+  diff: unknown
+  created_at: string
+}
+
+let rows: AuditRow[] = []
+let loadError: string | null = null
+const mock = isMockMode()
+
+if (mock) {
+  // No Supabase yet — show a placeholder row so the UI still renders.
+  loadError = 'Mock mode: audit_log is only populated against a real Supabase database.'
+} else {
+  try {
+    const { getAdminClient } = await import('../../lib/supabase-admin')
+    const supabaseAdmin = getAdminClient()
+    let q = supabaseAdmin
+      .from('audit_log')
+      .select('id, table_name, record_id, action, actor_id, diff, created_at')
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (fTable) q = q.eq('table_name', fTable)
+    if (fAction) q = q.eq('action', fAction)
+    if (fFrom) q = q.gte('created_at', fFrom)
+    if (fTo) q = q.lte('created_at', fTo)
+    const { data, error } = await q
+    if (error) {
+      loadError = error.message
+    } else {
+      rows = (data ?? []) as AuditRow[]
+    }
+  } catch (e) {
+    loadError = (e as Error).message
+    Astro.locals.log?.warn('audit page: query failed', { error: loadError })
+  }
+}
+
+function fmtTs(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return d.toISOString().replace('T', ' ').slice(0, 19) + 'Z'
+  } catch {
+    return iso
+  }
+}
+
+function shortId(id: string | null): string {
+  if (!id) return '—'
+  return id.length > 8 ? id.slice(0, 8) + '…' : id
+}
+
+function diffPreview(diff: unknown): string {
+  if (diff == null) return ''
+  try {
+    const s = JSON.stringify(diff)
+    return s.length > 80 ? s.slice(0, 80) + '…' : s
+  } catch {
+    return String(diff)
+  }
+}
+---
+<Base title="Audit log — A & R Management">
+  <AdminNav />
+  <div class="max-w-6xl mx-auto px-4 py-10">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">Audit log</h1>
+        <p class="text-gray-500 mt-1">Most recent {rows.length} entries (max 100)</p>
+      </div>
+      <a href="/admin" class="text-sm text-gray-500 hover:text-gray-800">← Dashboard</a>
+    </div>
+
+    <form method="get" class="border border-gray-200 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-gray-600 mb-1">Table</span>
+        <select name="table" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+          <option value="">All</option>
+          {TABLE_OPTIONS.map((t) => (
+            <option value={t} selected={t === fTable}>{t}</option>
+          ))}
+        </select>
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-gray-600 mb-1">Action</span>
+        <select name="action" class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm">
+          <option value="">All</option>
+          {ACTION_OPTIONS.map((a) => (
+            <option value={a} selected={a === fAction}>{a}</option>
+          ))}
+        </select>
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-gray-600 mb-1">From</span>
+        <input type="date" name="from" value={fFrom} class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+      </label>
+      <label class="block text-sm">
+        <span class="block text-xs font-medium text-gray-600 mb-1">To</span>
+        <input type="date" name="to" value={fTo} class="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+      </label>
+      <div class="flex gap-2">
+        <button type="submit" class="bg-[var(--color-brand)] text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-[var(--color-brand-dark)] transition">Apply</button>
+        <a href="/admin/audit" class="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium hover:border-gray-400 transition">Reset</a>
+      </div>
+    </form>
+
+    {loadError && (
+      <div class="border border-amber-300 bg-amber-50 text-amber-900 rounded-lg p-3 mb-4 text-sm">
+        <strong>Note:</strong> {loadError}
+      </div>
+    )}
+
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+          <tr>
+            <th class="px-3 py-2 font-medium">When</th>
+            <th class="px-3 py-2 font-medium">Table</th>
+            <th class="px-3 py-2 font-medium">Action</th>
+            <th class="px-3 py-2 font-medium">Record</th>
+            <th class="px-3 py-2 font-medium">Actor</th>
+            <th class="px-3 py-2 font-medium">Diff</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && !loadError && (
+            <tr>
+              <td colspan="6" class="px-3 py-6 text-center text-gray-500">No audit entries match these filters.</td>
+            </tr>
+          )}
+          {rows.map((r) => (
+            <tr class="border-b border-gray-100 last:border-0 align-top">
+              <td class="px-3 py-2 font-mono text-xs text-gray-700 whitespace-nowrap">{fmtTs(r.created_at)}</td>
+              <td class="px-3 py-2"><code class="text-xs">{r.table_name}</code></td>
+              <td class="px-3 py-2">
+                <span class={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                  r.action === 'delete' ? 'bg-red-100 text-red-800'
+                  : r.action === 'insert' ? 'bg-green-100 text-green-800'
+                  : r.action === 'status_change' ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100 text-gray-800'
+                }`}>{r.action}</span>
+              </td>
+              <td class="px-3 py-2 font-mono text-xs" title={r.record_id}>{shortId(r.record_id)}</td>
+              <td class="px-3 py-2 font-mono text-xs text-gray-600" title={r.actor_id ?? ''}>{shortId(r.actor_id)}</td>
+              <td class="px-3 py-2">
+                {r.diff != null ? (
+                  <details>
+                    <summary class="cursor-pointer text-xs text-gray-600 hover:text-gray-900">{diffPreview(r.diff)}</summary>
+                    <pre class="mt-1 text-xs bg-gray-50 border border-gray-200 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words max-w-md">{JSON.stringify(r.diff, null, 2)}</pre>
+                  </details>
+                ) : (
+                  <span class="text-gray-400 text-xs">—</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</Base>
