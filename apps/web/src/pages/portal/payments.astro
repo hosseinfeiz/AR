@@ -2,12 +2,14 @@
 export const prerender = false
 import Base from '../../layouts/Base.astro'
 import PortalNav from '../../components/PortalNav.astro'
+import { StripeAchSetup } from '../../components/islands/StripeAchSetup'
 import { getSession } from '../../lib/auth'
 import {
   findTenantById,
   chargesForTenant,
   paymentsForTenant,
 } from '../../lib/tenant-fixtures'
+import { getAdminClient } from '../../lib/supabase-admin'
 
 const session = getSession(Astro.cookies)
 if (!session || session.type !== 'tenant') {
@@ -19,6 +21,40 @@ if (!tenant) return Astro.redirect('/login')
 
 const allCharges = chargesForTenant(tenant.id)
 const allPayments = paymentsForTenant(tenant.id)
+
+// Look up the tenant's active payment method (if any) so we can show the
+// ACH status badge / decide whether to render the setup form.
+type ExistingMethod = {
+  last4: string | null
+  bankName: string | null
+  brand: string | null
+  type: string
+} | null
+let existingMethod: ExistingMethod = null
+try {
+  const supa = getAdminClient()
+  const { data } = await supa
+    .from('tenant_payment_methods')
+    .select('last4, bank_name, brand, type, status')
+    .eq('tenant_id', tenant.id)
+    .eq('status', 'active')
+    .order('is_default', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (data) {
+    existingMethod = {
+      last4: data.last4 ?? null,
+      bankName: data.bank_name ?? null,
+      brand: data.brand ?? null,
+      type: data.type ?? 'us_bank_account',
+    }
+  }
+} catch {
+  // Schema not ready (degraded mode) — just don't show the badge.
+  existingMethod = null
+}
+
+const stripePublishableKey = import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ''
 
 function fmt(cents: number) {
   return (cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -46,6 +82,20 @@ const chargePill: Record<string, string> = {
   <PortalNav active="payments" />
   <div class="max-w-5xl mx-auto px-4 py-8 space-y-8">
     <h1 class="text-3xl font-bold tracking-tight">Payments</h1>
+
+    <!-- Auto-pay (ACH) -->
+    <div class="border border-gray-200 rounded-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-100 bg-gray-50">
+        <h2 class="font-semibold">Auto-pay</h2>
+      </div>
+      <div class="px-5 py-4">
+        <StripeAchSetup
+          client:only="react"
+          publishableKey={stripePublishableKey}
+          existingMethod={existingMethod}
+        />
+      </div>
+    </div>
 
     <!-- Charges -->
     <div class="border border-gray-200 rounded-xl overflow-hidden">
