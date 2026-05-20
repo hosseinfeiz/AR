@@ -1,0 +1,62 @@
+---
+// Lightweight badge showing "your rent vs market" for a unit.
+//
+// Fetches /api/admin/units/:id/rent-comp client-side, so SSR stays cheap
+// and the badge renders progressively. When RENTOMETER_API_KEY is unset
+// the API returns a clearly-labeled mock fallback; the badge surfaces
+// that label so admins know not to treat the figure as authoritative.
+//
+// Note: this is meant to drop into UnitCard.astro (next to the rent
+// figure). S10 does NOT modify UnitCard directly — see the integration
+// note in the runbook.
+
+interface Props {
+  unitId: string
+}
+const { unitId } = Astro.props
+---
+<div
+  class="rent-comp-badge inline-flex items-center text-xs text-gray-500"
+  data-unit-id={unitId}
+>
+  <span class="rent-comp-status" aria-live="polite">Loading market…</span>
+</div>
+
+<script>
+  type Source = 'rentometer' | 'mock-fallback' | 'unavailable'
+  interface Resp {
+    ok: boolean
+    rent_comp: { source: Source; delta_vs_median_pct: number }
+    summary: string
+  }
+  function colorFor(src: Source, pct: number): string {
+    if (src === 'mock-fallback') return 'text-gray-500'
+    if (Math.abs(pct) < 5) return 'text-green-700'
+    if (pct > 0) return 'text-amber-700'
+    return 'text-blue-700'
+  }
+  async function hydrate(el: HTMLElement) {
+    const unitId = el.dataset.unitId
+    const statusEl = el.querySelector<HTMLElement>('.rent-comp-status')
+    if (!unitId || !statusEl) return
+    try {
+      const res = await fetch(`/api/admin/units/${unitId}/rent-comp`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) {
+        // Most likely the viewer is not an admin — drop the badge silently.
+        el.remove()
+        return
+      }
+      const data = (await res.json()) as Resp
+      statusEl.textContent = data.summary
+      const klass = colorFor(data.rent_comp.source, data.rent_comp.delta_vs_median_pct)
+      statusEl.className = `rent-comp-status ${klass}`
+    } catch {
+      el.remove()
+    }
+  }
+  for (const el of document.querySelectorAll<HTMLElement>('.rent-comp-badge')) {
+    hydrate(el)
+  }
+</script>

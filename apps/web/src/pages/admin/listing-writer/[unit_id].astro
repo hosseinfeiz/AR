@@ -1,0 +1,149 @@
+---
+export const prerender = false
+import Base from '../../../layouts/Base.astro'
+import AdminNav from '../../../components/AdminNav.astro'
+import { getSession } from '../../../lib/auth'
+import { units, buildings } from '../../../lib/fixtures'
+
+const session = getSession(Astro.cookies)
+if (!session || session.type !== 'admin') {
+  return Astro.redirect(`/login?redirect=/admin/listing-writer/${Astro.params.unit_id}`)
+}
+
+const unitId = Astro.params.unit_id
+const unit = units.find((u) => u.id === unitId)
+if (!unit) {
+  return new Response('Unit not found', { status: 404 })
+}
+const building = buildings.find((b) => b.id === unit.building_id)
+
+function fmtRent(cents: number) {
+  return `$${(cents / 100).toLocaleString('en-US')}`
+}
+const beds = unit.bedrooms === 0 ? 'Studio' : `${unit.bedrooms} bd`
+---
+<Base title={`Listing writer — Unit ${unit.unit_number} — Admin — A & R Management`}>
+  <AdminNav />
+  <div class="max-w-3xl mx-auto px-4 py-10">
+    <p class="text-sm text-gray-500 mb-1">
+      <a href="/admin" class="hover:underline">Admin</a> /
+      Listing writer
+    </p>
+    <h1 class="text-3xl font-bold tracking-tight mb-1">AI listing writer</h1>
+    <p class="text-gray-500 mb-6">Unit {unit.unit_number} · {building?.name}</p>
+
+    <div class="border border-gray-200 rounded-xl p-5 mb-6 bg-gray-50">
+      <p class="text-sm text-gray-600">
+        <strong>{beds}</strong> · {unit.bathrooms} ba{unit.sqft ? ` · ${unit.sqft} sqft` : ''} ·
+        <strong>{fmtRent(unit.monthly_rent_cents)}/mo</strong>
+      </p>
+      <p class="text-sm text-gray-600 mt-1">Current description:</p>
+      <p class="text-sm text-gray-800 mt-1 whitespace-pre-wrap" id="current-description">{unit.description_md}</p>
+    </div>
+
+    <form id="gen-form" class="space-y-3 mb-6">
+      <label class="block text-sm font-medium" for="notes">Optional notes for Claude</label>
+      <textarea
+        id="notes"
+        name="notes"
+        rows="3"
+        class="block w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-brand)]/40"
+        placeholder="e.g. emphasize the free garage stall, or play down the no-elevator detail."
+      ></textarea>
+      <button
+        type="submit"
+        id="gen-btn"
+        class="inline-flex items-center bg-[var(--color-brand)] text-white px-5 py-2 rounded font-medium hover:bg-[var(--color-brand-dark)] disabled:bg-gray-400"
+      >
+        Generate variants
+      </button>
+      <span id="gen-status" class="text-sm text-gray-500 ml-3"></span>
+    </form>
+
+    <div id="ai-disabled" class="hidden border border-amber-300 bg-amber-50 text-amber-900 rounded p-3 mb-4 text-sm">
+      AI is disabled (ANTHROPIC_API_KEY not set). Generation is unavailable in this environment.
+    </div>
+
+    <div id="variants" class="space-y-4"></div>
+
+    <div id="save-area" class="hidden mt-6 border border-green-300 bg-green-50 rounded-xl p-4">
+      <p class="text-sm text-green-900 mb-2">Saved draft (not yet persisted to the DB).</p>
+      <pre id="save-preview" class="text-xs whitespace-pre-wrap bg-white border border-green-200 rounded p-3"></pre>
+    </div>
+  </div>
+
+  <script is:inline define:vars={{ unitId }}>
+    const form = document.getElementById('gen-form')
+    const btn = document.getElementById('gen-btn')
+    const status = document.getElementById('gen-status')
+    const variantsEl = document.getElementById('variants')
+    const aiDisabled = document.getElementById('ai-disabled')
+    const saveArea = document.getElementById('save-area')
+    const savePreview = document.getElementById('save-preview')
+
+    function esc(s) {
+      return s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+    }
+
+    function renderVariants(variants) {
+      variantsEl.innerHTML = ''
+      if (!variants || variants.length === 0) {
+        variantsEl.innerHTML =
+          '<p class="text-sm text-gray-500">No variants returned. Try again with different notes.</p>'
+        return
+      }
+      for (const v of variants) {
+        const card = document.createElement('div')
+        card.className = 'border border-gray-200 rounded-xl p-5'
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs uppercase tracking-wide font-medium text-gray-500">${esc(v.kind)}</span>
+            <button type="button" data-action="use" class="text-sm text-[var(--color-brand)] hover:underline">Use this draft →</button>
+          </div>
+          <h3 class="text-lg font-semibold mb-2">${esc(v.title)}</h3>
+          <textarea rows="6" class="block w-full border border-gray-200 rounded px-3 py-2 text-sm">${esc(v.body_md)}</textarea>
+        `
+        card.querySelector('[data-action="use"]').addEventListener('click', () => {
+          const draft = card.querySelector('textarea').value
+          saveArea.classList.remove('hidden')
+          savePreview.textContent = `Title: ${v.title}\n\n${draft}`
+        })
+        variantsEl.appendChild(card)
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      btn.disabled = true
+      status.textContent = 'Generating…'
+      variantsEl.innerHTML = ''
+      aiDisabled.classList.add('hidden')
+      try {
+        const notes = document.getElementById('notes').value.trim()
+        const res = await fetch(`/api/admin/units/${unitId}/generate-listing`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ notes: notes || undefined }),
+        })
+        const data = await res.json()
+        if (!res.ok || !data.ok) {
+          status.textContent = `Error: ${data.error ?? res.status}`
+          return
+        }
+        if (data.ai_enabled === false) {
+          aiDisabled.classList.remove('hidden')
+        }
+        renderVariants(data.variants)
+        status.textContent = `Done · ${data.variants.length} variant${data.variants.length === 1 ? '' : 's'}`
+      } catch (err) {
+        status.textContent = `Network error: ${err.message}`
+      } finally {
+        btn.disabled = false
+      }
+    })
+  </script>
+</Base>
