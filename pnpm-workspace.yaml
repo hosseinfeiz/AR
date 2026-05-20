@@ -1,3 +1,6 @@
 packages:
-  - "apps/*"
+  - "apps/web"
   - "packages/*"
+  # apps/lynx is archived (see apps/lynx/ARCHIVED.md). The web app's PWA is
+  # the supported mobile path now. Remove this comment when apps/lynx is
+  # deleted from disk.

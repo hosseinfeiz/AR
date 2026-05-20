@@ -3,6 +3,7 @@ import react from '@astrojs/react'
 import sitemap from '@astrojs/sitemap'
 import tailwindcss from '@tailwindcss/vite'
 import sentry from '@sentry/astro'
+import AstroPWA from '@vite-pwa/astro'
 
 const SITE = process.env.PUBLIC_SITE_URL ?? 'https://ar-management.example'
 
@@ -32,6 +33,52 @@ export default defineConfig({
     react(),
     sitemap({
       filter: (page) => !page.includes('/api/') && !page.endsWith('/robots.txt'),
+    }),
+    AstroPWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      manifest: false, // We ship our own /manifest.webmanifest in public/.
+      includeAssets: ['favicon.svg', 'favicon.ico', 'manifest.webmanifest', 'icons/*.png'],
+      workbox: {
+        // Skip raw building photos from precache — they're large and the runtime
+        // image-cache below handles them lazily.
+        globPatterns: ['**/*.{js,css,html,svg,ico,webmanifest}', 'icons/*.png'],
+        globIgnores: ['**/buildings/**'],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        // Private routes must never be served from cache.
+        navigateFallback: null,
+        navigateFallbackDenylist: [/^\/api\//, /^\/portal\//, /^\/admin\//],
+        runtimeCaching: [
+          {
+            // Static images (buildings, units) — cache-first with a 30d max.
+            urlPattern: ({ request, url }) =>
+              request.destination === 'image' &&
+              !url.pathname.startsWith('/api/') &&
+              !url.pathname.startsWith('/portal/') &&
+              !url.pathname.startsWith('/admin/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ar-images',
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+          {
+            // Marketing pages — stale-while-revalidate, never touching auth routes.
+            urlPattern: ({ url, request }) =>
+              request.mode === 'navigate' &&
+              !url.pathname.startsWith('/api/') &&
+              !url.pathname.startsWith('/portal/') &&
+              !url.pathname.startsWith('/admin/'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'ar-pages',
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 },
+            },
+          },
+        ],
+      },
+      devOptions: { enabled: false },
     }),
     // Sentry has Node-specific deps; skip on Cloudflare to keep the Worker bundle small.
     ...(process.env.PUBLIC_SENTRY_DSN && !isCloudflare
