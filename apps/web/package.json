@@ -20,6 +20,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.65.0",
     "@ar/shared": "workspace:^",
     "@astrojs/cloudflare": "^13.3.0",
     "@astrojs/react": "^5.0.4",
@@ -33,6 +34,8 @@
     "@tailwindcss/vite": "^4.2.4",
     "stripe": "^22.1.1",
     "astro": "^6.2.1",
+    "openai": "^4.78.1",
+    "pdf-parse": "^1.1.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.75.0",
@@ -42,6 +45,7 @@
     "@astrojs/check": "^0.9.9",
     "@axe-core/playwright": "^4.11.3",
     "@playwright/test": "^1.59.1",
+    "@types/pdf-parse": "^1.1.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.4",
